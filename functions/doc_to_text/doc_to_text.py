@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from argparse import ArgumentParser
 import os
 import subprocess
 from tempfile import NamedTemporaryFile
@@ -10,7 +9,7 @@ from utils import download_file, upload_file
 LAMBDA_TASK_ROOT = os.environ.get('LAMBDA_TASK_ROOT', os.path.dirname(os.path.abspath(__file__)))
 
 
-def doc_to_text(event, context):
+def extract(event, context):
     try: doc_path = download_file(event)
     except Exception as e: return dict(success=False, reason=u'Exception while downloading from <{}>: {}'.format(event['doc_uri'], e))
 
@@ -31,10 +30,11 @@ def doc_to_text(event, context):
 
 
 def main():
+    from argparse import ArgumentParser
     parser = ArgumentParser(description='Extract text from binary documents.')
     parser.parse_args()
 
-    print doc_to_text(dict(doc_uri='s3://docbot-test-lambda/office97.doc', text_uri='s3://docbot-test-lambda/office97.txt'), None)
+    print extract(dict(doc_uri='s3://docbot-test-lambda/office97.doc', text_uri='s3://docbot-test-lambda/office97.txt'), None)
 #end def
 
 

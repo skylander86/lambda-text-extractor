@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from argparse import ArgumentParser
 import os
 import subprocess
 
@@ -27,6 +26,7 @@ def pdf_to_text(event, context):
 
 
 def main():
+    from argparse import ArgumentParser
     parser = ArgumentParser(description='Extract text from binary documents.')
     parser.parse_args()
 
