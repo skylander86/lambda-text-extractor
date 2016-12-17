@@ -1,3 +1,4 @@
+from argparse import ArgumentParser
 import os
 import subprocess
 from tempfile import NamedTemporaryFile
@@ -31,11 +32,19 @@ def pdf_to_text(event, context):
 
     text_path = os.path.splitext(doc_path)[0] + '.txt'
 
-    try: s3_client.upload_file(text_path, bucket, doc_id + '.txt')
+    try: s3_client.upload_file(text_path, bucket, doc_id + '.txt', ExtraArgs=dict(ContentType='text/plain', ContentEncoding='utf-8'))
     except Exception as e: return dict(success=False, reason=u'Exception while uploading document to S3: {}'.format(e))
 
     return dict(success=True, bucket=bucket, text_key=doc_id + '.txt', doc_id=doc_id, size=os.path.getsize(text_path))
 #end def
 
 
-print pdf_to_text(dict(bucket='airpr-sentiment-analysis', key='text.pdf'), {})
+def main():
+    parser = ArgumentParser(description='Extract text from binary documents.')
+    parser.parse_args()
+
+    print pdf_to_text(dict(bucket='airpr-sentiment-analysis', key='text.pdf'), {})
+#end def
+
+
+if __name__ == '__main__': main()
