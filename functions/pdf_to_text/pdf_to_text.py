@@ -3,41 +3,26 @@
 from argparse import ArgumentParser
 import os
 import subprocess
-from tempfile import NamedTemporaryFile
 
-import boto3
+from .utils import download_file, upload_file
 
 LAMBDA_TASK_ROOT = os.environ.get('LAMBDA_TASK_ROOT', os.path.dirname(os.path.abspath(__file__)))
-BIN_DIR = LAMBDA_TASK_ROOT
-# BIN_DIR = os.path.join(LAMBDA_TASK_ROOT, 'bin-linux_x64')
-LIB_DIR = os.path.join(LAMBDA_TASK_ROOT, 'lib-linux_x64')
-
-s3_client = boto3.client('s3')
 
 
-def doc_to_text(event, context):
-    bucket = event['bucket']
-    doc_key = event['key']
+def pdf_to_text(event, context):
+    try: doc_path = download_file(event)
+    except Exception as e: return dict(success=False, reason=u'Exception while downloading from <{}>: {}'.format(event['doc_uri'], e))
 
-    doc_id, doc_ext = os.path.splitext(doc_key)
-
-    with NamedTemporaryFile(prefix='intelllex_', suffix='.doc', delete=False) as f:
-        doc_path = f.name
-    #end with
-
-    try: s3_client.download_file(bucket, doc_key, doc_path)
-    except Exception as e: return dict(success=False, reason=u'Exception while getting document from S3: {}'.format(e))
-
-    cmdline = [os.path.join(BIN_DIR, 'doctotext'), '-nopgbrk', doc_path]
-    try: subprocess.check_call(cmdline, shell=False)
+    cmdline = [os.path.join(LAMBDA_TASK_ROOT, 'pdftotext'), '-nopgbrk', doc_path]
+    try:
+        subprocess.check_call(cmdline, shell=False)
+        text_path = os.path.splitext(doc_path)[0] + '.txt'
     except subprocess.CalledProcessError as e: return dict(success=False, reason=u'Exception while executing {}: {}'.format(cmdline, e))
 
-    text_path = os.path.splitext(doc_path)[0] + '.txt'
+    try: upload_file(event, text_path)
+    except Exception as e: return dict(success=False, reason=u'Exception while uploading to <{}>: {}'.format(event['text_uri'], e))
 
-    try: s3_client.upload_file(text_path, bucket, doc_id + '.txt', ExtraArgs=dict(ContentType='text/plain', ContentEncoding='utf-8'))
-    except Exception as e: return dict(success=False, reason=u'Exception while uploading document to S3: {}'.format(e))
-
-    return dict(success=True, bucket=bucket, text_key=doc_id + '.txt', doc_id=doc_id, size=os.path.getsize(text_path))
+    return dict(success=True, doc_uri=event['doc_uri'], text_uri=event['text_uri'], size=os.path.getsize(text_path))
 #end def
 
 
@@ -45,7 +30,7 @@ def main():
     parser = ArgumentParser(description='Extract text from binary documents.')
     parser.parse_args()
 
-    print doc_to_text(dict(bucket='docbot-test-lambda', key='text.doc'), {})
+    print pdf_to_text(dict(doc_uri='s3://docbot-test-lambda/text.pdf', text_uri='s3://docbot-test-lambda/text.txt'), None)
 #end def
 
 
