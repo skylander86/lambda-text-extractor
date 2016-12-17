@@ -1,6 +1,0 @@
-{
-    "name": "doc_to_text",
-    "description": "Extract text from Office 97 and older Word documents (using Antiword).",
-    "handler": "doc_to_text.extract",
-    "timeout": 300
-}

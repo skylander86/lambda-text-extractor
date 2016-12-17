@@ -1,6 +1,0 @@
-{
-    "name": "pdf_to_text",
-    "description": "Extract text from \"text\" PDFs.",
-    "handler": "pdf_to_text.extract",
-    "timeout": 300
-}
