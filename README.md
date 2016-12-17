@@ -78,3 +78,7 @@ We more or less followed instructions from [here](http://stackoverflow.com/quest
     cp /usr/local/share/tessdata/eng.traineddata text-extractor/lib-linux_x64/tesseract/
     cp /usr/local/bin/tesseract text-extractor/bin-linux_x64/
 
+## Lambda-izing
+
+We use [apex](http://apex.run/) as our development toolchain for managing AWS lambda deploys
+
