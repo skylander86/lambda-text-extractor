@@ -2,14 +2,27 @@
 
 Python wrapper app to extract text from various binary formats.
 
-## Obtaining binaries
+## Deploying on AWS Lambda
+
+We use [apex](http://apex.run/) for our development toolchain to manage AWS lambda functions.
+
+Configure `project.json` with the account specific settings, install apex, and run
+
+    apex deploy
+
+to deploy the lambda functions. :)
+
+## Notes on building / packaging for AWS Lambda execution environment
+
+The executables, configs, and libraries in `bin-linux_x64` and `lib-linux_x64` has been compiled on an EC2 instance with a fresh install of `amzn-ami-hvm-2016.03.3.x86_64-gp2` AMI (this is AWS Lambda's execution AMI as of 12/17/2016).
+Below are notes on how we obtained these binaries.
 
 ### Pre-requisites
 
 You will need
 
 - an EC2 instance with [AWS Lambda's execution environment](http://docs.aws.amazon.com/lambda/latest/dg/current-supported-versions.html), i.e., the same AMI.
-- `sudo yum groupinstall "Development Tools"` for compiling some of the binaries from source
+- to do `sudo yum groupinstall "Development Tools"` for compiling some of the binaries from source
 
 ### pdftotext
 
@@ -77,8 +90,3 @@ We more or less followed instructions from [here](http://stackoverflow.com/quest
     cp /usr/lib64/{libpng12.so.0,libjpeg.so.62,libtiff.so.5,libstdc++.so.6,libjbig.so.2.0} text-extractor/lib-linux_x64/tesseract/
     cp /usr/local/share/tessdata/eng.traineddata text-extractor/lib-linux_x64/tesseract/
     cp /usr/local/bin/tesseract text-extractor/bin-linux_x64/
-
-## Lambda-izing
-
-We use [apex](http://apex.run/) as our development toolchain for managing AWS lambda deploys
-
