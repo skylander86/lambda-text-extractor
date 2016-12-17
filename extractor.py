@@ -36,3 +36,6 @@ def pdf_to_text(event, context):
 
     return dict(success=True, bucket=bucket, text_key=doc_id + '.txt', doc_id=doc_id, size=os.path.getsize(text_path))
 #end def
+
+
+pdf_to_text(dict(bucket='airpr-sentiment-analysis', key='image.pdf'), {})
