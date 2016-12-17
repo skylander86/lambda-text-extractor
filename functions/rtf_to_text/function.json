@@ -1,0 +1,6 @@
+{
+    "name": "rtf_to_text",
+    "description": "Extract text from Rich Text Format documents (using unrtf).",
+    "handler": "rtf_to_text.extract",
+    "timeout": 300
+}
