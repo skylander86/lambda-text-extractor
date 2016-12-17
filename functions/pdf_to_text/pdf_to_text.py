@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 import os
 import subprocess
 
-from .utils import download_file, upload_file
+from utils import download_file, upload_file
 
 LAMBDA_TASK_ROOT = os.environ.get('LAMBDA_TASK_ROOT', os.path.dirname(os.path.abspath(__file__)))
 
