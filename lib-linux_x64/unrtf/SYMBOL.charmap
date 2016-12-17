@@ -1,0 +1,257 @@
+<U0000>     /x00         NULL
+<U0001>     /x01         START OF HEADING
+<U0002>     /x02         START OF TEXT
+<U0003>     /x03         END OF TEXT
+<U0004>     /x04         END OF TRANSMISSION
+<U0005>     /x05         ENQUIRY
+<U0006>     /x06         ACKNOWLEDGE
+<U0007>     /x07         BELL
+<U0008>     /x08         BACKSPACE
+<U0009>     /x09         HORIZONTAL TABULATION
+<U000A>     /x0a         LINE FEED
+<U000B>     /x0b         VERTICAL TABULATION
+<U000C>     /x0c         FORM FEED
+<U000D>     /x0d         CARRIAGE RETURN
+<U000E>     /x0e         SHIFT OUT
+<U000F>     /x0f         SHIFT IN
+<U0010>     /x10         DATA LINK ESCAPE
+<U0011>     /x11         DEVICE CONTROL ONE
+<U0012>     /x12         DEVICE CONTROL TWO
+<U0013>     /x13         DEVICE CONTROL THREE
+<U0014>     /x14         DEVICE CONTROL FOUR
+<U0015>     /x15         NEGATIVE ACKNOWLEDGE
+<U0016>     /x16         SYNCHRONOUS IDLE
+<U0017>     /x17         END OF TRANSMISSION BLOCK
+<U0018>     /x18         CANCEL
+<U0019>     /x19         END OF MEDIUM
+<U001A>     /x1a         SUBSTITUTE
+<U001B>     /x1b         ESCAPE
+<U001C>     /x1c         FILE SEPARATOR
+<U001D>     /x1d         GROUP SEPARATOR
+<U001E>     /x1e         RECORD SEPARATOR
+<U001F>     /x1f         UNIT SEPARATOR
+<U0020>     /x20         SPACE
+<U0021>     /x21         EXCLAMATION MARK
+<U0022>     /x22         QUOTATION MARK
+<U0023>     /x23         NUMBER SIGN
+<U0024>     /x24         DOLLAR SIGN
+<U0025>     /x25         PERCENT SIGN
+<U0026>     /x26         AMPERSAND
+<U0027>     /x27         APOSTROPHE
+<U0028>     /x28         LEFT PARENTHESIS
+<U0029>     /x29         RIGHT PARENTHESIS
+<U002A>     /x2a         ASTERISK
+<U002B>     /x2b         PLUS SIGN
+<U002C>     /x2c         COMMA
+<U002D>     /x2d         HYPHEN-MINUS
+<U002E>     /x2e         FULL STOP
+<U002F>     /x2f         SOLIDUS
+<U0030>     /x30         DIGIT ZERO
+<U0031>     /x31         DIGIT ONE
+<U0032>     /x32         DIGIT TWO
+<U0033>     /x33         DIGIT THREE
+<U0034>     /x34         DIGIT FOUR
+<U0035>     /x35         DIGIT FIVE
+<U0036>     /x36         DIGIT SIX
+<U0037>     /x37         DIGIT SEVEN
+<U0038>     /x38         DIGIT EIGHT
+<U0039>     /x39         DIGIT NINE
+<U003A>     /x3a         COLON
+<U003B>     /x3b         SEMICOLON
+<U003C>     /x3c         LESS-THAN SIGN
+<U003D>     /x3d         EQUALS SIGN
+<U003E>     /x3e         GREATER-THAN SIGN
+<U003F>     /x3f         QUESTION MARK
+<U2245>     /x40         APPROXIMATELY EQUAL TO
+<U0391>     /x41         GREEK CAPITAL LETTER ALPHA
+<U0392>     /x42         GREEK CAPITAL LETTER BETA
+<U03A7>     /x43         GREEK CAPITAL LETTER CHI
+<U0394>     /x44         GREEK CAPITAL LETTER DELTA
+<U0395>     /x45         GREEK CAPITAL LETTER EPSILON
+<U03A6>     /x46         GREEK CAPITAL LETTER PHI
+<U0393>     /x47         GREEK CAPITAL LETTER GAMMA
+<U0397>     /x48         GREEK CAPITAL LETTER ETA
+<U0399>     /x49         GREEK CAPITAL LETTER IOTA
+<U03D1>     /x4a         GREEK THETA SYMBOL
+<U039A>     /x4b         GREEK CAPITAL LETTER KAPPA
+<U039B>     /x4c         GREEK CAPITAL LETTER LAMBDA
+<U039C>     /x4d         GREEK CAPITAL LETTER MU
+<U039D>     /x4e         GREEK CAPITAL LETTER NU
+<U039F>     /x4f         GREEK CAPITAL LETTER OMICRON
+<U03A0>     /x50         GREEK CAPITAL LETTER PI
+<U0398>     /x51         GREEK CAPITAL LETTER THETA
+<U03A1>     /x52         GREEK CAPITAL LETTER RHO
+<U03A3>     /x53         GREEK CAPITAL LETTER SIGMA
+<U03A4>     /x54         GREEK CAPITAL LETTER TAU
+<U03A5>     /x55         GREEK CAPITAL LETTER UPSILON
+<U03C2>     /x56         GREEK SMALL LETTER FINAL SIGMA
+<U03A9>     /x57         GREEK CAPITAL LETTER OMEGA
+<U039E>     /x58         GREEK CAPITAL LETTER XI
+<U03A8>     /x59         GREEK CAPITAL LETTER PSI
+<U0396>     /x5a         GREEK CAPITAL LETTER ZETA
+<U005B>     /x5b         LEFT SQUARE BRACKET
+<U2234>     /x5c         THEREFORE
+<U005D>     /x5d         RIGHT SQUARE BRACKET
+<U22A5>     /x5e         UP TACK
+<U005F>     /x5f         LOW LINE
+<U203E>     /x60         OVERLINE
+<U03B1>     /x61         GREEK SMALL LETTER ALPHA
+<U03B2>     /x62         GREEK SMALL LETTER BETA
+<U03C7>     /x63         GREEK SMALL LETTER CHI
+<U03B4>     /x64         GREEK SMALL LETTER DELTA
+<U03B5>     /x65         GREEK SMALL LETTER EPSILON
+<U03C6>     /x66         GREEK SMALL LETTER PHI
+<U03B3>     /x67         GREEK SMALL LETTER GAMMA
+<U03B7>     /x68         GREEK SMALL LETTER ETA
+<U03B9>     /x69         GREEK SMALL LETTER IOTA
+<U03D5>     /x6a         GREEK SMALL LETTER SCRIPT RHO
+<U03BA>     /x6b         GREEK SMALL LETTER KAPPA
+<U03BB>     /x6c         GREEK SMALL LETTER LAMBDA
+<U03BC>     /x6d         GREEK SMALL LETTER MU
+<U03BD>     /x6e         GREEK SMALL LETTER NU
+<U03BF>     /x6f         GREEK SMALL LETTER OMICRON
+<U03C0>     /x70         GREEK SMALL LETTER PI
+<U03B8>     /x71         GREEK SMALL LETTER THETA
+<U03C1>     /x72         GREEK SMALL LETTER RHO
+<U03C3>     /x73         GREEK SMALL LETTER SIGMA
+<U03C4>     /x74         GREEK SMALL LETTER TAU
+<U03C5>     /x75         GREEK SMALL LETTER UPSILON
+<U03D6>     /x76         GREEK PI SYMBOL
+<U03C9>     /x77         GREEK SMALL LETTER OMEGA
+<U03BE>     /x78         GREEK SMALL LETTER XI
+<U03C8>     /x79         GREEK SMALL LETTER PSI
+<U03B6>     /x7a         GREEK SMALL LETTER ZETA
+<U007B>     /x7b         LEFT CURLY BRACKET
+<U007C>     /x7c         VERTICAL LINE
+<U007D>     /x7d         RIGHT CURLY BRACKET
+<U223C>     /x7e         TILDE OPERATOR
+<U0000>     /x7f         NULL
+<U0000>     /xc2/x80     NULL
+<U0000>     /xc2/x81     NULL
+<U0000>     /xc2/x82     NULL
+<U0000>     /xc2/x83     NULL
+<U0000>     /xc2/x84     NULL
+<U0000>     /xc2/x85     NULL
+<U0000>     /xc2/x86     NULL
+<U0000>     /xc2/x87     NULL
+<U0000>     /xc2/x88     NULL
+<U0000>     /xc2/x89     NULL
+<U0000>     /xc2/x8a     NULL
+<U0000>     /xc2/x8b     NULL
+<U0000>     /xc2/x8c     NULL
+<U0000>     /xc2/x8d     NULL
+<U0000>     /xc2/x8e     NULL
+<U0000>     /xc2/x8f     NULL
+<U0000>     /xc2/x90     NULL
+<U0000>     /xc2/x91     NULL
+<U0000>     /xc2/x92     NULL
+<U0000>     /xc2/x93     NULL
+<U0000>     /xc2/x94     NULL
+<U0000>     /xc2/x95     NULL
+<U0000>     /xc2/x96     NULL
+<U0000>     /xc2/x97     NULL
+<U0000>     /xc2/x98     NULL
+<U0000>     /xc2/x99     NULL
+<U0000>     /xc2/x9a     NULL
+<U0000>     /xc2/x9b     NULL
+<U0000>     /xc2/x9c     NULL
+<U0000>     /xc2/x9d     NULL
+<U0000>     /xc2/x9e     NULL
+<U0000>     /xc2/x9f     NULL
+<U0000>     /xc2/xa0     NULL
+<U03D2>     /xc2/xa1     GREEK UPSILON WITH HOOK SYMBOL
+<U2032>     /xc2/xa2     PRIME
+<U2264>     /xc2/xa3     LESS-THAN OR EQUAL TO
+<U2044>     /xc2/xa4     FRACTION SLASH
+<U221E>     /xc2/xa5     INFINITY
+<U0192>     /xc2/xa6     LATIN SMALL LETTER F WITH HOOK
+<U2663>     /xc2/xa7     BLACK CLUB SUIT
+<U2666>     /xc2/xa8     BLACK DIAMOND SUIT
+<U2665>     /xc2/xa9     BLACK HEART SUIT
+<U2660>     /xc2/xaa     BLACK SPADE SUIT
+<U2194>     /xc2/xab     LEFT RIGHT ARROW
+<U2190>     /xc2/xac     LEFTWARDS ARROW
+<U2191>     /xc2/xad     UP ARROW
+<U2192>     /xc2/xae     RIGHTWARDS ARROW
+<U2193>     /xc2/xaf     DOWNWARDS ARROW
+<U00B0>     /xc2/xb0     DEGREE SIGN
+<U00B1>     /xc2/xb1     PLUS-MINUS SIGN
+<U2033>     /xc2/xb2     DOUBLE PRIME
+<U2265>     /xc2/xb3     GREATER-THAN OR EQUAL TO
+<U00D7>     /xc2/xb4     MULTIPLICATION SIGN
+<U221D>     /xc2/xb5     PROPORTIONAL TO
+<U2202>     /xc2/xb6     PARTIAL DIFFERENTIAL
+<U2022>     /xc2/xb7     BULLET
+<U00F7>     /xc2/xb8     DIVISION SIGN
+<U2260>     /xc2/xb9     NOT EQUAL TO
+<U2261>     /xc2/xba     IDENTICAL TO
+<U2248>     /xc2/xbb     ALMOST EQUAL TO
+<U2026>     /xc2/xbc     HORIZONTAL ELLIPSIS
+<U2502>     /xc2/xbd     BOX DRAWINGS LIGHT VERTICAL
+<U2014>     /xc2/xbe     EM DASH
+<U21B5>     /xc2/xbf     DOWNWARDS ARROW WITH CORNER LEFTWARDS
+<U2135>     /xc3/x80     ALEF SYMBOL
+<U2111>     /xc3/x81     BLACK-LETTER CAPITAL I
+<U211C>     /xc3/x82     BLACK-LETTER CAPITAL R
+<U2118>     /xc3/x83     SCRIPT CAPITAL P
+<U2297>     /xc3/x84     CIRCLED TIMES
+<U2295>     /xc3/x85     CIRCLED PLUS
+<U2205>     /xc3/x86     EMPTY SET
+<U2229>     /xc3/x87     INTERSECTION
+<U222A>     /xc3/x88     UNION
+<U2283>     /xc3/x89     SUPERSET OF
+<U2287>     /xc3/x8a     SUPERSET OF OR EQUAL TO
+<U2284>     /xc3/x8b     NOT A SUBSET OF
+<U2282>     /xc3/x8c     SUBSET OF
+<U2286>     /xc3/x8d     SUBSET OF OR EQUAL TO
+<U2208>     /xc3/x8e     ELEMENT OF
+<U2209>     /xc3/x8f     NOT AN ELEMENT OF
+<U2220>     /xc3/x90     ANGLE
+<U2207>     /xc3/x91     NABLA
+<U00AE>     /xc3/x92     REGISTERED SIGN
+<U00A9>     /xc3/x93     COPYRIGHT SIGN
+<U2122>     /xc3/x94     TRADE MARK SIGN
+<U220F>     /xc3/x95     N-ARY PRODUCT
+<U221A>     /xc3/x96     SQUARE ROOT
+<U00B7>     /xc3/x97     MIDDLE DOT
+<U00AC>     /xc3/x98     NOT SIGN
+<U2227>     /xc3/x99     LOGICAL AND
+<U2228>     /xc3/x9a     LOGICAL OR
+<U21D4>     /xc3/x9b     LEFT RIGHT DOUBLE ARROW
+<U21D0>     /xc3/x9c     LEFTWARDS DOUBLE ARROW
+<U21D1>     /xc3/x9d     UPWARDS DOUBLE ARROW
+<U21D2>     /xc3/x9e     RIGHTWARDS DOUBLE ARROW
+<U21D3>     /xc3/x9f     DOWNWARDS DOUBLE ARROW
+<U25CA>     /xc3/xa0     LOZENGE
+<U2329>     /xc3/xa1     LEFT-POINTING ANGLE BRACKET
+<U00AE>     /xc3/xa2     REGISTERED SIGN
+<U00A9>     /xc3/xa3     COPYRIGHT SIGN
+<U2122>     /xc3/xa4     TRADE MARK SIGN
+<U2211>     /xc3/xa5     N-ARY SUMMATION
+<U239B>     /xc3/xa6     left parenthesis upper hook
+<U239C>     /xc3/xa7     left parenthesis extension
+<U239D>     /xc3/xa8     left parenthesis lower hook
+<U2308>     /xc3/xa9     LEFT CEILING
+<U007C>     /xc3/xaa     VERTICAL LINE
+<U230A>     /xc3/xab     LEFT FLOOR
+<U23A7>     /xc3/xac     left brace top (curly bracket)
+<U23A8>     /xc3/xad     left brace middle            
+<U23A9>     /xc3/xae     left brace bottom            
+<U007C>     /xc3/xaf     VERTICAL LINE
+<U00F0>     /xc3/xb0     LATIN SMALL LETTER ETH
+<U232A>     /xc3/xb1     RIGHT-POINTING ANGLE BRACKET
+<U222B>     /xc3/xb2     INTEGRAL
+<U2320>     /xc3/xb3     integral top
+<U23AE>     /xc3/xb4     integral extension
+<U2321>     /xc3/xb5     integral bottom
+<U239E>     /xc3/xb6     right parenthesis top
+<U239F>     /xc3/xb7     right parenthesis extension
+<U23A0>     /xc3/xb8     right parenthesis bottom
+<U2309>     /xc3/xb9     RIGHT CEILING (right bracket top)
+<U007C>     /xc3/xba     VERTICAL LINE
+<U230B>     /xc3/xbb     RIGHT FLOOR
+<U23AB>     /xc3/xbc     right brace top (curly bracket)
+<U23AC>     /xc3/xbd     right brace middle
+<U23AD>     /xc3/xbe     right brace bottom            
+<U0000>     /xc3/xbf     ff
+
