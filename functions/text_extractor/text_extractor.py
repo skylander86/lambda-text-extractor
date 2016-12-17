@@ -16,9 +16,10 @@ def extract(event, context):
     try: doc_path = download_file(event)
     except Exception as e: return dict(success=False, reason=u'Exception while downloading from <{}>: {}'.format(event['doc_uri'], e))
 
-    # decide file format
-    _, ext = os.path.splitext(doc_path)
+    _, ext = os.path.splitext(doc_path)  # get format from extension
     parse_func = PARSE_FUNCS.get(ext.lower())
+
+    # todo text_encoding in event
 
     if parse_func is None:
         return dict(success=False, reason=u'Unknown file type <{}>'.format(event['doc_uri']))
@@ -29,7 +30,7 @@ def extract(event, context):
 
     text = o['text']
 
-    with NamedTemporaryFile(prefix='intelllex_', suffix='.txt', delete=False) as f:
+    with NamedTemporaryFile(prefix='text-extractor.', suffix='.txt', delete=False) as f:
         text_path = f.name
         if isinstance(text, unicode): f.write(text.encode('utf-8'))
         else: f.write(text)

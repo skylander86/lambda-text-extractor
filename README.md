@@ -1,6 +1,6 @@
-# text-extractor -- Extracting Text from Binary Document Formats
+# Extracting Text from Binary Document Formats
 
-A Python app that works with the AWS Lambda architecture to extract text from common binary document formats.
+`text-extractor` is a Python app that works with the AWS Lambda architecture to extract text from common binary document formats.
 
 Currently, it supports:
 
@@ -8,17 +8,19 @@ Currently, it supports:
 - Microsoft Word 2, 6, 7, 97, 2000, 2002 and 2003 (using [Antiword](http://www.winfield.demon.nl/))
 - Rich Text Format (using [UnRTF](https://www.gnu.org/software/unrtf/))
 
+The extracted text will always be encoded in UTF-8.
+
 ## Deploying on AWS Lambda
 
 We use [apex](http://apex.run/) for our development toolchain to manage AWS lambda functions.
 
-Configure `project.json` with the account specific settings, install apex, and run
+Configure `project.json` with the account specific settings (you will also need your AWS credentials somewhere), install apex, and run
 
     apex deploy
 
 to deploy the lambda functions. :)
 
-## Using on its own
+## Using it without AWS Lambda
 
 ## Notes on building / packaging for AWS Lambda execution environment
 
