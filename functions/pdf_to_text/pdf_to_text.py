@@ -30,7 +30,7 @@ def main():
     parser = ArgumentParser(description='Extract text from binary documents.')
     parser.parse_args()
 
-    print pdf_to_text(dict(doc_uri='s3://docbot-test-lambda/text.pdf', text_uri='s3://docbot-test-lambda/text.txt'), None)
+    print pdf_to_text(dict(doc_uri='s3://docbot-test-lambda/text_pdf.pdf', text_uri='s3://docbot-test-lambda/text_pdf.txt'), None)
 #end def
 
 
