@@ -1,6 +1,12 @@
 # text-extractor
 
-Python wrapper app to extract text from various binary formats.
+A Python app that works with the AWS Lambda architecture to extract text from common binary document formats.
+
+Currently, it supports:
+
+- "Text" PDF files (using [pdftotext](http://www.foolabs.com/xpdf/download.html))
+- Microsoft Word 2, 6, 7, 97, 2000, 2002 and 2003 (using [Antiword](http://www.winfield.demon.nl/))
+- Rich Text Format (using [UnRTF](https://www.gnu.org/software/unrtf/))
 
 ## Deploying on AWS Lambda
 
@@ -11,6 +17,8 @@ Configure `project.json` with the account specific settings, install apex, and r
     apex deploy
 
 to deploy the lambda functions. :)
+
+## Using on its own
 
 ## Notes on building / packaging for AWS Lambda execution environment
 
@@ -51,7 +59,7 @@ We use `pdftotext` to extract text directly from PDF files. `pdftotext` is based
 
 ### Antiword
 
-[Antiword](http://www.winfield.demon.nl/#Programmer) handles Office 97 formats.
+[Antiword](http://www.winfield.demon.nl/) handles Office 97 formats.
 
     curl http://www.winfield.demon.nl/linux/antiword-0.37.tar.gz | tar xzv
     cd antiword-0.37 && make
