@@ -15,12 +15,12 @@ def extract(event, context):
 
     cmdline = [os.path.join(LAMBDA_TASK_ROOT, 'antiword'), '-t', '-w', '0', '-m', 'UTF-8', doc_path]
     try:
-        text = subprocess.check_output(cmdline, shell=False, env=dict(ANTIWORDHOME=os.path.join(LAMBDA_TASK_ROOT, 'lib')))
+        text = subprocess.check_output(cmdline, shell=False, stderr=subprocess.STDOUT, env=dict(ANTIWORDHOME=os.path.join(LAMBDA_TASK_ROOT, 'lib')))
         with NamedTemporaryFile(prefix='intelllex_', suffix='.txt', delete=False) as f:
             text_path = f.name
             f.write(text)
         #end with
-    except subprocess.CalledProcessError as e: return dict(success=False, reason=u'Exception while executing {}: {} (output={})'.format(cmdline, e, text))
+    except subprocess.CalledProcessError as e: return dict(success=False, reason=u'Exception while executing {}: {} (output={})'.format(cmdline, e, e.output))
 
     try: upload_file(event, text_path)
     except Exception as e: return dict(success=False, reason=u'Exception while uploading to <{}>: {}'.format(event['text_uri'], e))
