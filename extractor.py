@@ -38,4 +38,4 @@ def pdf_to_text(event, context):
 #end def
 
 
-pdf_to_text(dict(bucket='airpr-sentiment-analysis', key='image.pdf'), {})
+print pdf_to_text(dict(bucket='airpr-sentiment-analysis', key='image.pdf'), {})
