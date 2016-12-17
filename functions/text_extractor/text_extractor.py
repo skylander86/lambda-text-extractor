@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import codecs
+import logging
 import os
 import subprocess
 from tempfile import NamedTemporaryFile
@@ -10,6 +11,9 @@ from utils import download_file, upload_file
 LAMBDA_TASK_ROOT = os.environ.get('LAMBDA_TASK_ROOT', os.path.dirname(os.path.abspath(__file__)))
 BIN_DIR = os.path.join(LAMBDA_TASK_ROOT, 'bin')
 LIB_DIR = os.path.join(LAMBDA_TASK_ROOT, 'lib')
+
+logging.basicConfig(format=u'%(asctime)-15s [%(name)s] %(levelname)s: %(message)s', level=logging.INFO)
+logger = logging.getLogger()
 
 
 def extract(event, context):
@@ -32,14 +36,18 @@ def extract(event, context):
 
     with NamedTemporaryFile(prefix='text-extractor.', suffix='.txt', delete=False) as f:
         text_path = f.name
-        if isinstance(text, unicode): f.write(text.encode('utf-8'))
-        else: f.write(text)
+        if isinstance(text, unicode):
+            f.write(text.encode('utf-8'))
+        else:
+            logger.warning(u'Text extracted from <{}> is not in unicode!'.format(event['doc_uri']))
+            f.write(text)
+        #end if
     #end with
 
     try: upload_file(event, text_path)
     except Exception as e: return dict(success=False, reason=u'Exception while uploading to <{}>: {}'.format(event['text_uri'], e))
 
-    return dict(success=True, doc_uri=event['doc_uri'], text_uri=event['text_uri'], size=len(text))
+    return dict(success=True, doc_uri=event['doc_uri'], text_uri=event['text_uri'], size=len(text), method=parse_func.__name__)
 #end def
 
 
@@ -50,8 +58,9 @@ def pdf_to_text(doc_path):
         text_path = os.path.splitext(doc_path)[0] + '.txt'
     except subprocess.CalledProcessError as e: return dict(success=False, reason=u'Exception while executing {}: {}'.format(cmdline, e, e.output))
 
-    with codecs.open(text_path, 'r', 'utf-8') as f:
+    with codecs.open(text_path, 'r', 'utf-8', errors='ignore') as f:
         text = f.read()
+    text = text.strip()
 
     return dict(success=True, text=text)
 #end def
@@ -61,9 +70,10 @@ def doc_to_text(doc_path):
     cmdline = [os.path.join(BIN_DIR, 'antiword'), '-t', '-w', '0', '-m', 'UTF-8', doc_path]
     try:
         text = subprocess.check_output(cmdline, shell=False, stderr=subprocess.STDOUT, env=dict(ANTIWORDHOME=os.path.join(LIB_DIR, 'antiword')))
+        text = text.decode('utf-8', errors='ignore')
     except subprocess.CalledProcessError as e: return dict(success=False, reason=u'Exception while executing {}: {} (output={})'.format(cmdline, e, e.output))
 
-    return dict(success=True, text=text)
+    return dict(success=True, text=text.strip())
 #end def
 
 
@@ -71,20 +81,21 @@ def rtf_to_text(doc_path):
     cmdline = [os.path.join(BIN_DIR, 'unrtf'), '-P', os.path.join(LIB_DIR, 'unrtf'), '--text', doc_path]
     try:
         text = subprocess.check_output(cmdline, shell=False, stderr=subprocess.STDOUT)
+        text = text.decode('utf-8', errors='ignore')
 
         new_lines = []
         in_header = True
-        for line in text.split('\n'):
+        for line in text.split(u'\n'):
             if in_header and line.startswith('###'): continue
             else:
                 new_lines.append(line)
                 in_header = False
             #end if
         #end for
-        text = '\n'.join(new_lines)
+        text = u'\n'.join(new_lines)
     except subprocess.CalledProcessError as e: return dict(success=False, reason=u'Exception while executing {}: {} (output={})'.format(cmdline, e, e.output))
 
-    return dict(success=True, text=text)
+    return dict(success=True, text=text.strip())
 #end def
 
 
