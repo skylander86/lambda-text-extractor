@@ -1,4 +1,4 @@
-# text-extractor
+# text-extractor -- Extracting Text from Binary Document Formats
 
 A Python app that works with the AWS Lambda architecture to extract text from common binary document formats.
 
