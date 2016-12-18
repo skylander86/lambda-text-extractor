@@ -5,6 +5,7 @@ from tempfile import NamedTemporaryFile
 from urlparse import urlparse
 
 import boto3
+import botocore
 
 s3_client = boto3.client('s3')
 
@@ -70,7 +71,6 @@ def delete_objects(uris):
 
     for chunk in _chunks(s3_keys, 1000):
         s3_client.delete_objects(Bucket=s3_bucket, Delete=dict(Objects=[dict(Key=k) for k in chunk]))
-        print dict(Objects=[dict(Key=k) for k in chunk])
 #end def
 
 
@@ -82,4 +82,20 @@ def upload_file(uri, text_path):
     #end if
 
     return s3_client.upload_file(text_path, bucket, doc_key, ExtraArgs=dict(ContentType='text/plain', ContentEncoding='utf-8'))
+#end def
+
+
+def head_object(uri):
+    o = urlparse(uri)
+
+    if o.scheme == 's3':
+        bucket, doc_key = o.netloc, o.path.lstrip('/')
+    #end if
+
+    try:
+        response = s3_client.head_object(Bucket=bucket, Key=doc_key)
+        return response
+    except botocore.exceptions.ClientError:
+        pass
+    return None
 #end def

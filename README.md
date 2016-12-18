@@ -21,7 +21,7 @@ Configure `project.json` with the account specific settings (you will also need 
 
 to deploy the lambda functions. :)
 
-You need to make sure your IAM role has `lambda:InvokeFunction` permissions.
+You need to make sure your IAM role has `lambda:InvokeFunction` permissions, and `s3:DeleteObject` permissions on the output bucket.
 
 ### Invoking the AWS Lambda
 
@@ -117,10 +117,18 @@ We are using Tesseract 3.05.00dev.
 [ImageMagick](https://www.imagemagick.org/) is used to resample and convert between image types.
 Many of the libraries needed here are similar to that for Tesseract.
 
-
     curl https://www.imagemagick.org/download/ImageMagick.tar.gz | tar xvz
     cd ImageMagick-7.0.3 && ./configure && make && cd ..
 
     cp ImageMagick-7.0.3/utilities/magick text-extractor/bin-linux_x64/magick
 
 The shared libraries required are a subset of that for Tesseract, hence we will directly use `lib-linux_x64/tesseract` as the `LD_LIBRARY_PATH`.
+
+### lxml
+
+[lxml](http://lxml.de/) library is used for many of the XML formats.
+
+    sudo pip install lxml
+    
+
+https://github.com/cjpetrus/lambda-lxml-base/blob/master/lxml_amazon_binaries.zip

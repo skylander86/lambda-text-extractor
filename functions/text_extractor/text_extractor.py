@@ -5,16 +5,15 @@ from datetime import datetime, time
 import json
 import logging
 import os
-import re
 import subprocess
 from tempfile import NamedTemporaryFile
+from time import sleep
 
 import boto3
-from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
 from PyPDF2 import PdfFileReader
 import xlrd
 
-from utils import download_file, upload_file, get_file_content, delete_objects
+from utils import download_file, upload_file, get_file_content, delete_objects, head_object
 
 LAMBDA_TASK_ROOT = os.environ.get('LAMBDA_TASK_ROOT', os.path.dirname(os.path.abspath(__file__)))
 BIN_DIR = os.path.join(LAMBDA_TASK_ROOT, 'bin')
@@ -66,7 +65,7 @@ def extract(event, context):
     try: upload_file(text_uri, text_path)
     except Exception as e: return dict(success=False, reason=u'Exception while uploading to <{}>: {}'.format(text_uri, e))
 
-    del o['text']
+    if not event.get('text', False): del o['text']
     o['doc_uri'] = doc_uri
     o['text_uri'] = text_uri
     o['size'] = len(text)
@@ -103,52 +102,34 @@ def pdf_to_text_with_ocr(doc_path, event, context):
     doc_uri = event['doc_uri']
     text_uri = event['text_uri']
 
-    def _invoke(page):
-        payload = dict(doc_uri=doc_uri, text_uri=text_uri + '-{}'.format(page), page=page, force_ocr=True)
-        return lambda_client.invoke(FunctionName='text-extractor_text_extractor', InvocationType='RequestResponse', LogType='None', Payload=json.dumps(payload))
-    #end def
+    page_text_uris = {}
+    for page in xrange(1, num_pages + 1):
+        page_text_uri = text_uri + '-{}'.format(page)
+        lambda_client.invoke(
+            FunctionName='text-extractor_text_extractor',
+            InvocationType='Event',
+            LogType='None',
+            Payload=json.dumps(
+                dict(doc_uri=doc_uri, text_uri=page_text_uri, page=page, force_ocr=True)
+            )
+        )
+        page_text_uris[page_text_uri] = page
+    #end for
 
-    executor = ThreadPoolExecutor(max_workers=min(num_pages, 32))
-
-    future_pages = [executor.submit(_invoke, page) for page in xrange(1, num_pages + 1)]
-    page_content_futures = {}
-    page_text_uris = []
-
-    try:
-        for f in as_completed(future_pages, timeout=60.0):
-            result = json.loads(f.result()['Payload'].read())
-            if not result['success']:
-                continue
-
-            page_text_uri = result['text_uri']
-
-            m = re.search(ur'\-(\d+)$', page_text_uri)
-            if not m:
-                raise Exception('Got invalid text_uri <{}> when extracting text from <{}>.'.format(page_text_uri, doc_uri))
-
-            page = int(m.group(1))
-            if page in page_content_futures:
-                raise Exception('Saw page {} more than once while extracting text from <{}>.'.format(page, doc_uri))
-            page_content_futures[executor.submit(get_file_content, page_text_uri)] = page
-            page_text_uris.append(page_text_uri)
-        #end for
-    except TimeoutError:
-        logger.warn('TimeoutError while OCR-ing pages of <{}>. There might be missing pages in the extracted text.'.format(doc_uri))
-    #end try
-    print context.get_remaining_time_in_millis()
-
+    processing = page_text_uris.copy()
     page_contents = {}
-    try:
-        for f in as_completed(page_content_futures, timeout=60.0):
-            page = page_content_futures[f]
-            page_contents[page] = f.result()
+    while len(processing) > 0 and context.get_remaining_time_in_millis() > 5000:  # leave 10 seconds to concatenate text and return it
+        sleep(1.0)
+
+        for uri, page in processing.items():
+            if head_object(uri):
+                page_contents[page] = get_file_content(uri)
+                del processing[uri]
+            #end if
         #end for
-    except TimeoutError:
-        logger.warn('TimeoutError while downloading OCR-ed text of <{}>. There might be missing pages in the extracted text.'.format(doc_uri))
+    #end while
 
-    executor.shutdown(wait=False)
-
-    delete_objects(page_text_uris)
+    delete_objects(page_text_uris.keys())
 
     contents = []
     for page in xrange(1, num_pages + 1):
@@ -261,7 +242,6 @@ PARSE_FUNCS = {
     '.png': image_to_text,
     '.tiff': image_to_text,
     '.jpg': image_to_text,
-    '.gif': image_to_text,
     '.jpeg': image_to_text,
 }
 

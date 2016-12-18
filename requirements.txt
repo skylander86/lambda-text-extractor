@@ -2,3 +2,4 @@ boto3 == 1.4.1
 
 PyPDF2
 xlrd
+python-pptx
