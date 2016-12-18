@@ -179,6 +179,7 @@ PARSE_FUNCS = {
     '.pdf': pdf_to_text,
     '.png': image_to_text,
     '.tiff': image_to_text,
+    '.tif': image_to_text,
     '.jpg': image_to_text,
     '.jpeg': image_to_text,
 }
