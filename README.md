@@ -2,12 +2,22 @@
 
 `text-extractor` is a Python app that works with the AWS Lambda architecture to extract text from common binary document formats.
 
-Currently, it supports:
+Due to the size of code and dependencies (and AWS deployment limits), it is split into two functions.
 
-- "Text" PDF files (using [pdftotext](http://www.foolabs.com/xpdf/download.html))
-- Microsoft Word 2, 6, 7, 97, 2000, 2002 and 2003 (using [Antiword](http://www.winfield.demon.nl/))
-- Rich Text Format (using [UnRTF](https://www.gnu.org/software/unrtf/) v0.21.9)
-- Images and "image" PDF (using [Ghostscript](https://ghostscript.com/download/gsdnld.html) 9.20 for PDF manipulation, [ImageMagick](https://www.imagemagick.org/) 7.0.3-10 for image handling, and [Tesseract](https://github.com/tesseract-ocr/tesseract/) 3.05.00dev for OCR)
+`pdf_extractor` supports extracting text from
+
+- "Text" PDF files (using [pdftotext](http://www.foolabs.com/xpdf/download.html)),
+- Images (TIFF, JPEG, PNG) and "image" PDF (using [Ghostscript](https://ghostscript.com/download/gsdnld.html) 9.20 for PDF manipulation, [ImageMagick](https://www.imagemagick.org/) 7.0.3-10 for image handling, and [Tesseract](https://github.com/tesseract-ocr/tesseract/) 3.05.00dev for OCR)
+
+while `office_extractor` handles text extraction from
+
+- Microsoft Word 2, 6, 7, 97, 2000, 2002 and 2003 (using [Antiword](http://www.winfield.demon.nl/)),
+- Microsoft Word 2007 OpenXML files (using [python-docx](https://github.com/python-openxml/python-docx)),
+- Microsoft PowerPoint 2007 OpenXML files (using [python-pptx](https://github.com/scanny/python-pptx)),
+- Microsoft Excel 5.0, 97-2003, and 2007 OpenXML files (using [xlrd](http://xlrd.readthedocs.io/en/latest/)),
+- HTML web pages (using [lxml](http://lxml.de/)),
+- Rich Text Format (using [UnRTF](https://www.gnu.org/software/unrtf/) v0.21.9),
+- CSV and Text files (duh)
 
 The extracted text will always be encoded in UTF-8.
 
@@ -126,7 +136,7 @@ The shared libraries required are a subset of that for Tesseract, hence we will 
 
 ### lxml
 
-[lxml](http://lxml.de/) library is used for many of the XML formats. 
+[lxml](http://lxml.de/) library is used for many of the XML formats.
 We use the pre-compiled for AWS Lambda lxml package from [lambda-lxml-base](https://github.com/cjpetrus/lambda-lxml-base)
 
 ### Pillow
