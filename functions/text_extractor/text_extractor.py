@@ -7,6 +7,7 @@ import os
 import subprocess
 from tempfile import NamedTemporaryFile, mkdtemp
 
+from PyPDF2 import PdfFileReader
 import xlrd
 
 from utils import download_file, upload_file
@@ -33,10 +34,12 @@ def extract(event, context):
     if parse_func is None:
         return dict(success=False, reason=u'Unknown file type <{}>'.format(doc_uri))
 
-    if parse_func is pdf_to_text and event.get('force_ocr'):
-        parse_func = pdf_to_text_with_ocr
+    if ext == '.pdf' and event.get('force_ocr'):
+        parse_func = pdf_to_text_with_ocr_single_page if 'page' in event else pdf_to_text_with_ocr
+    #end if
 
-    o = parse_func(doc_path, event, context)
+    try: o = parse_func(doc_path, event, context)
+    except Exception as e: return dict(success=False, reason=u'Exception while parsing <{}> using <{}>: {}'.format(doc_uri, parse_func.__name__, e))
 
     if not o['success']: return o
 
@@ -78,19 +81,36 @@ def pdf_to_text(doc_path, event, context):
 
 
 def pdf_to_text_with_ocr(doc_path, event, context):
-    temp_dir_path = mkdtemp(prefix='text-extractor.')
-    text_uri = event['text_uri']
+    with open(doc_path) as f:
+        reader = PdfFileReader(f)
+        num_pages = reader.getNumPages()
+    #end with
 
-    # https://mazira.com/blog/optimal-image-conversion-settings-tesseract-ocr
-    cmdline = [os.path.join(BIN_DIR, 'gs-920-linux_x86_64'), '-sDEVICE=png16m', '-dINTERPOLATE', '-r300', '-o', os.path.join(temp_dir_path, '%d.png'), '-dNOPAUSE', '-dSAFER', '-c', '67108864', 'setvmthreshold', '-dGraphicsAlphaBits=4', '-dTextAlphaBits=4', '-f', doc_path]
+    print num_pages
+#end def
 
-    try:
-        subprocess.check_output(cmdline, shell=False, stderr=subprocess.STDOUT)
-        for png_path in os.listdir(temp_dir_path):
-            upload_file(text_uri + '/' + png_path, os.path.join(temp_dir_path, png_path))
+
+def pdf_to_text_with_ocr_single_page(doc_path, event, context):
+    pageno = event['page']
+    with NamedTemporaryFile(prefix='text-extractor.', suffix='.png', delete=False) as f:
+        image_page_path = f.name
+
+    cmdline = [os.path.join(BIN_DIR, 'gs-920-linux_x86_64'), '-sDEVICE=png16m', '-dFirstPage={}'.format(pageno), '-dLastPage='.format(pageno), '-dINTERPOLATE', '-r300', '-o', image_page_path, '-dNOPAUSE', '-dSAFER', '-c', '67108864', 'setvmthreshold', '-dGraphicsAlphaBits=4', '-dTextAlphaBits=4', '-f', doc_path]
+    try: subprocess.check_output(cmdline, shell=False, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e: return dict(success=False, reason=u'Exception while executing {}: {}'.format(cmdline, e, e.output))
 
-    return dict(success=True, text=u'\n'.join(os.listdir(temp_dir_path)), method='pdf_to_text_with_ocr')
+    return image_to_text(image_page_path, event, context)
+#end def
+
+
+def image_to_text(doc_path, event, context):
+    cmdline = [os.path.join(BIN_DIR, 'tesseract'), doc_path, doc_path, '-l', 'eng', '-psm', '6', '--tessdata-dir', os.path.join(LIB_DIR, 'tesseract')]
+    try: subprocess.check_call(cmdline, stderr=subprocess.STDOUT, shell=False, env=dict(LD_LIBRARY_PATH=os.path.join(LIB_DIR, 'tesseract')))
+    except subprocess.CalledProcessError as e: return dict(success=False, reason=u'Exception while executing {}: {}'.format(cmdline, e, e.output))
+    with codecs.open(doc_path + '.txt', 'r', 'utf-8') as f:
+        text = f.read().strip()
+
+    return dict(success=True, text=text)
 #end def
 
 
@@ -154,8 +174,9 @@ PARSE_FUNCS = {
     '.rtf': rtf_to_text,
     '.doc': doc_to_text,
     '.xls': xls_to_text,
+    '.xlsx': xls_to_text,
 }
 
 if __name__ == '__main__':
-    print xls_to_text('../../Downloads/excel95.xls', None, None)['text']
+    print pdf_to_text_with_ocr('../../Downloads/image_pdf.pdf', None, None)['text']
 #end if
