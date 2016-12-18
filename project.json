@@ -2,8 +2,7 @@
     "name": "text-extractor",
     "description": "Extract text from binary documents.",
     "runtime": "python",
-    "memory": 128,
-    "timeout": 300,
+    "timeout": 150,
     "profile": "default",
     "role": "arn:aws:iam::394252546268:role/lambda_basic_execution"
 }

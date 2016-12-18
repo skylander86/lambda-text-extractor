@@ -6,7 +6,8 @@ Currently, it supports:
 
 - "Text" PDF files (using [pdftotext](http://www.foolabs.com/xpdf/download.html))
 - Microsoft Word 2, 6, 7, 97, 2000, 2002 and 2003 (using [Antiword](http://www.winfield.demon.nl/))
-- Rich Text Format (using [UnRTF](https://www.gnu.org/software/unrtf/))
+- Rich Text Format (using [UnRTF](https://www.gnu.org/software/unrtf/) v0.21.9)
+- Images and "image" PDF (using [Ghostscript](https://ghostscript.com/download/gsdnld.html) 9.20 for PDF manipulation, [ImageMagick](https://www.imagemagick.org/) 7.0.3-10 for image handling, and [Tesseract](https://github.com/tesseract-ocr/tesseract/) 3.05.00dev for OCR)
 
 The extracted text will always be encoded in UTF-8.
 
@@ -19,6 +20,12 @@ Configure `project.json` with the account specific settings (you will also need 
     apex deploy
 
 to deploy the lambda functions. :)
+
+You need to make sure your IAM role has `lambda:InvokeFunction` permissions.
+
+### Invoking the AWS Lambda
+
+
 
 ## Using it without AWS Lambda
 
@@ -71,7 +78,7 @@ We use `pdftotext` to extract text directly from PDF files. `pdftotext` is based
 
 ### Unrtf
 
-[Unrtf](https://www.gnu.org/software/unrtf/) is a command-line program written in C which can convert documents in Rich Text Format (.rtf) to text.
+[UnRTF](https://www.gnu.org/software/unrtf/) is a command-line program written in C which can convert documents in Rich Text Format (.rtf) to text.
 
     curl https://www.gnu.org/software/unrtf/unrtf-0.21.9.tar.gz | tar xzv
     cd unrtf-0.21.9 && ./configure && make
@@ -82,6 +89,7 @@ We use `pdftotext` to extract text directly from PDF files. `pdftotext` is based
 
 [Tesseract](https://github.com/tesseract-ocr/tesseract/) is an OCR tool for converting images to text.
 We more or less followed instructions from [here](http://stackoverflow.com/questions/33588262/tesseract-ocr-on-aws-lambda-via-virtualenv).
+We are using Tesseract 3.05.00dev.
 
     sudo yum install libtool
     sudo yum install libjpeg-devel libpng-devel libtiff-devel zlib-devel
@@ -89,10 +97,9 @@ We more or less followed instructions from [here](http://stackoverflow.com/quest
     curl http://www.leptonica.com/source/leptonica-1.73.tar.gz | tar xzv
     cd leptonica-1.73 && ./configure && make && sudo make install && cd ..
 
-    curl -L https://github.com/tesseract-ocr/tesseract/archive/3.04-rc1.tar.gz | tar xzv
-    cd tesseract-3.04-rc1/ && ./autogen.sh && ./configure && make && sudo make install && cd ..
+    curl -L https://github.com/tesseract-ocr/tesseract/archive/3.05.tar.gz | tar xzv
+    cd tesseract-3.05/ && ./autogen.sh && ./configure && make && sudo make install && cd ..
 
-    sudo curl -L https://github.com/tesseract-ocr/tessdata/raw/master/eng.traineddata -o /usr/local/share/tessdata/eng.traineddata
 
     mkdir text-extractor/lib-linux_x64/tesseract
     cp /usr/local/lib/{libtesseract.so.3,liblept.so.5} text-extractor/lib-linux_x64/tesseract/
@@ -100,3 +107,20 @@ We more or less followed instructions from [here](http://stackoverflow.com/quest
     cp /usr/lib64/{libpng12.so.0,libjpeg.so.62,libtiff.so.5,libstdc++.so.6,libjbig.so.2.0} text-extractor/lib-linux_x64/tesseract/
     cp /usr/local/share/tessdata/eng.traineddata text-extractor/lib-linux_x64/tesseract/
     cp /usr/local/bin/tesseract text-extractor/bin-linux_x64/
+
+    mkdir text-extractor/lib-linux_x64/tesseract/tessdata
+    curl -L https://github.com/tesseract-ocr/tessdata/archive/3.04.00.tar.gz | tar xzv
+    cp tessdata-3.04.00/eng.* text-extractor/lib-linux_x64/tesseract/tessdata/
+
+### ImageMagick
+
+[ImageMagick](https://www.imagemagick.org/) is used to resample and convert between image types.
+Many of the libraries needed here are similar to that for Tesseract.
+
+
+    curl https://www.imagemagick.org/download/ImageMagick.tar.gz | tar xvz
+    cd ImageMagick-7.0.3 && ./configure && make && cd ..
+
+    cp ImageMagick-7.0.3/utilities/magick text-extractor/bin-linux_x64/magick
+
+The shared libraries required are a subset of that for Tesseract, hence we will directly use `lib-linux_x64/tesseract` as the `LD_LIBRARY_PATH`.
