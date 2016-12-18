@@ -43,7 +43,7 @@ The `extract` method in both `pdf_extractor` and `office_extractor` expects an `
 ### PDF parsing with OCR
 
 Due to the slow nature of OCR on images and AWS Lambda's 300 seconds execution limit, we used a hack (i.e., another lambda invocation) to OCR the pages of a PDF in parallel, while using S3 as our temporary store.
-When we determine that a PDF needs to be processed using OCR (i.e., standard text extraction yield < 512 bytes), we invoke `pdf_extractor.extract` with a special `event`:
+When we determine that a PDF needs to be processed using OCR (i.e., standard text extraction yield < 512 bytes), we automatically invoke `pdf_extractor.extract` asynchronously with a special `event`:
 ```json
 {
   "doc_uri": "s3://docbot-test-lambda/image.pdf",
@@ -52,12 +52,12 @@ When we determine that a PDF needs to be processed using OCR (i.e., standard tex
   "force_ocr": true
 }
 ```
-where `page` refers to the page of the original PDF that we want to extract text from.
+for every `page` in the original PDF that we want to extract text from.
 In the new lambda invocation, we use Ghostscript to convert that particular page to PNG and OCR using Tesseract to extract the text.
 
 The original calling lambda function will wait and poll S3 at 1 second intervals for extracted text.
 When all pages have been processed or when there is less than 5 seconds remaining on our clock, we will combine the pages' text that we have and return.
-Missing pages will be logged as a warning to the default logger.
+Occasionally, low resolution / complicated images will take > 300 seconds to complete and these missing pages will be logged as a warning to the default logger.
 If anybody knows of a better pattern for processing PDFs, do feel free to submit a pull request.
 
 Note that the `force_ocr` field can be used with any PDF to use OCR text extraction instead of `pdftotext`.
