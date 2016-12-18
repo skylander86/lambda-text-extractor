@@ -69,7 +69,8 @@ def delete_objects(uris):
     #end def
 
     for chunk in _chunks(s3_keys, 1000):
-        s3_client.delete_objects(Bucket=s3_bucket, Delete=dict(Objects=[dict(Key=k) for k in chunk]), Quiet=True)
+        s3_client.delete_objects(Bucket=s3_bucket, Delete=dict(Objects=[dict(Key=k) for k in chunk]))
+        print dict(Objects=[dict(Key=k) for k in chunk])
 #end def
 
 

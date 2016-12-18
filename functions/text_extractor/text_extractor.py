@@ -108,39 +108,45 @@ def pdf_to_text_with_ocr(doc_path, event, context):
         return lambda_client.invoke(FunctionName='text-extractor_text_extractor', InvocationType='RequestResponse', LogType='None', Payload=json.dumps(payload))
     #end def
 
-    with ThreadPoolExecutor(max_workers=min(num_pages, 256)) as executor:
-        future_pages = [executor.submit(_invoke, page) for page in xrange(1, num_pages + 1)]
-        page_content_futures = {}
-        page_text_uris = []
+    executor = ThreadPoolExecutor(max_workers=min(num_pages, 32))
 
-        try:
-            for f in as_completed(future_pages, timeout=min(60, context.get_remaining_time_in_millis() / 1000.0)):
-                result = json.loads(f.result()['Payload'].read())
-                page_text_uri = result['text_uri']
+    future_pages = [executor.submit(_invoke, page) for page in xrange(1, num_pages + 1)]
+    page_content_futures = {}
+    page_text_uris = []
 
-                m = re.search(ur'\-(\d+)$', page_text_uri)
-                if not m:
-                    raise Exception('Got invalid text_uri <{}> when extracting text from <{}>.'.format(page_text_uri, doc_uri))
+    try:
+        for f in as_completed(future_pages, timeout=60.0):
+            result = json.loads(f.result()['Payload'].read())
+            if not result['success']:
+                continue
 
-                page = int(m.group(1))
-                if page in page_content_futures:
-                    raise Exception('Saw page {} more than once while extracting text from <{}>.'.format(page, doc_uri))
-                page_content_futures[executor.submit(get_file_content, page_text_uri)] = page
-                page_text_uris.append(page_text_uri)
-            #end for
-        except TimeoutError:
-            logger.warn('TimeoutError while OCR-ing pages of <{}>. There might be missing pages in the extracted text.'.format(doc_uri))
-        #end try
+            page_text_uri = result['text_uri']
 
-        page_contents = {}
-        try:
-            for f in as_completed(page_content_futures, timeout=min(60, context.get_remaining_time_in_millis() / 1000.0)):
-                page = page_content_futures[f]
-                page_contents[page] = f.result()
-            #end for
-        except TimeoutError:
-            logger.warn('TimeoutError while downloading OCR-ed text of <{}>. There might be missing pages in the extracted text.'.format(doc_uri))
-    #end with
+            m = re.search(ur'\-(\d+)$', page_text_uri)
+            if not m:
+                raise Exception('Got invalid text_uri <{}> when extracting text from <{}>.'.format(page_text_uri, doc_uri))
+
+            page = int(m.group(1))
+            if page in page_content_futures:
+                raise Exception('Saw page {} more than once while extracting text from <{}>.'.format(page, doc_uri))
+            page_content_futures[executor.submit(get_file_content, page_text_uri)] = page
+            page_text_uris.append(page_text_uri)
+        #end for
+    except TimeoutError:
+        logger.warn('TimeoutError while OCR-ing pages of <{}>. There might be missing pages in the extracted text.'.format(doc_uri))
+    #end try
+    print context.get_remaining_time_in_millis()
+
+    page_contents = {}
+    try:
+        for f in as_completed(page_content_futures, timeout=60.0):
+            page = page_content_futures[f]
+            page_contents[page] = f.result()
+        #end for
+    except TimeoutError:
+        logger.warn('TimeoutError while downloading OCR-ed text of <{}>. There might be missing pages in the extracted text.'.format(doc_uri))
+
+    executor.shutdown(wait=False)
 
     delete_objects(page_text_uris)
 
