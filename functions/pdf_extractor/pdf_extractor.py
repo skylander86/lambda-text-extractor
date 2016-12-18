@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import codecs
-from datetime import datetime, time
 import json
 import logging
 import os
@@ -10,9 +9,7 @@ from tempfile import NamedTemporaryFile
 from time import sleep
 
 import boto3
-import pptx
 from PyPDF2 import PdfFileReader
-import xlrd
 
 from utils import download_file, upload_file, get_file_content, delete_objects, head_object
 
@@ -24,7 +21,6 @@ logging.basicConfig(format=u'%(asctime)-15s [%(name)s] %(levelname)s: %(message)
 logger = logging.getLogger()
 
 lambda_client = boto3.client('lambda')
-s3_client = boto3.client('s3')
 
 
 def extract(event, context):
@@ -53,7 +49,7 @@ def extract(event, context):
 
     text = o['text']
 
-    with NamedTemporaryFile(prefix='text-extractor.', suffix='.txt', delete=False) as f:
+    with NamedTemporaryFile(prefix='pdf-extractor.', suffix='.txt', delete=False) as f:
         text_path = f.name
         if isinstance(text, unicode):
             f.write(text.encode(text_encoding))
@@ -107,7 +103,7 @@ def pdf_to_text_with_ocr(doc_path, event, context):
     for page in xrange(1, num_pages + 1):
         page_text_uri = text_uri + '-{}'.format(page)
         lambda_client.invoke(
-            FunctionName='text-extractor_text_extractor',
+            FunctionName='pdf-extractor_text_extractor',
             InvocationType='Event',
             LogType='None',
             Payload=json.dumps(
@@ -145,7 +141,7 @@ def pdf_to_text_with_ocr(doc_path, event, context):
 
 def pdf_to_text_with_ocr_single_page(doc_path, event, context):
     pageno = event['page']
-    with NamedTemporaryFile(prefix='text-extractor.', suffix='.png', delete=False) as f:
+    with NamedTemporaryFile(prefix='pdf-extractor.', suffix='.png', delete=False) as f:
         image_page_path = f.name
 
     cmdline = [os.path.join(BIN_DIR, 'gs-920-linux_x86_64'), '-sDEVICE=png16m', '-dFirstPage={}'.format(pageno), '-dLastPage={}'.format(pageno), '-dINTERPOLATE', '-r300', '-o', image_page_path, '-dNOPAUSE', '-dSAFER', '-c', '67108864', 'setvmthreshold', '-dGraphicsAlphaBits=4', '-dTextAlphaBits=4', '-f', doc_path]
@@ -179,92 +175,10 @@ def image_to_text(doc_path, event, context):
 #end def
 
 
-def doc_to_text(doc_path, event, context):
-    cmdline = [os.path.join(BIN_DIR, 'antiword'), '-t', '-w', '0', '-m', 'UTF-8', doc_path]
-    try:
-        text = subprocess.check_output(cmdline, shell=False, stderr=subprocess.STDOUT, env=dict(ANTIWORDHOME=os.path.join(LIB_DIR, 'antiword')))
-        text = text.decode('utf-8', errors='ignore')
-    except subprocess.CalledProcessError as e: return dict(success=False, reason=u'Exception while executing {}: {} (output={})'.format(cmdline, e, e.output))
-
-    return dict(success=True, text=text.strip())
-#end def
-
-
-def rtf_to_text(doc_path, event, context):
-    cmdline = [os.path.join(BIN_DIR, 'unrtf'), '-P', os.path.join(LIB_DIR, 'unrtf'), '--text', doc_path]
-    try:
-        text = subprocess.check_output(cmdline, shell=False, stderr=subprocess.STDOUT)
-        text = text.decode('utf-8', errors='ignore')
-
-        new_lines = []
-        in_header = True
-        for line in text.split(u'\n'):
-            if in_header and line.startswith('###'): continue
-            else:
-                new_lines.append(line)
-                in_header = False
-            #end if
-        #end for
-        text = u'\n'.join(new_lines)
-    except subprocess.CalledProcessError as e: return dict(success=False, reason=u'Exception while executing {}: {} (output={})'.format(cmdline, e, e.output))
-
-    return dict(success=True, text=text.strip())
-#end def
-
-
-def xls_to_text(doc_path, event, context):
-    book = xlrd.open_workbook(doc_path)
-    lines = []
-    for sheet in book.sheets():
-        lines.append(sheet.name)
-        lines.append(u'-------------------------------------------')
-        for row in sheet.get_rows():
-            row_values = []
-            for cell in row:
-                if cell.ctype == xlrd.XL_CELL_DATE:
-                    d = datetime(*xlrd.xldate_as_tuple(cell.value, book.datemode))
-                    row_values.append(d.date() if d.time() == time(0, 0) else d)
-                elif cell.ctype == xlrd.XL_CELL_BOOLEAN: row_values.append(bool(cell.value))
-                else: row_values.append(cell.value)
-            #end for
-            lines.append(u'\t|\t'.join(map(lambda s: unicode(s).strip(), row_values)))
-    #end for
-
-    return dict(success=True, text=u'\n'.join(lines))
-#end def
-
-
-def pptx_to_text(doc_path, event, context):
-    prs = pptx.Presentation(doc_path)
-
-    # text_runs will be populated with a list of strings,
-    # one for each text run in presentation
-    text_runs = []
-
-    for slide in prs.slides:
-        for shape in slide.shapes:
-            if not shape.has_text_frame: continue
-            text_runs += [run.text for paragraph in shape.text_frame.paragraphs for run in paragraph.runs]
-        #end for
-    #end for
-
-    return dict(success=True, text=u'\n\n'.join(text_runs))
-#end def
-
-
 PARSE_FUNCS = {
     '.pdf': pdf_to_text,
     '.png': image_to_text,
     '.tiff': image_to_text,
     '.jpg': image_to_text,
     '.jpeg': image_to_text,
-    '.rtf': rtf_to_text,
-    '.doc': doc_to_text,
-    '.xls': xls_to_text,
-    '.xlsx': xls_to_text,
-    '.pptx': pptx_to_text,
 }
-
-if __name__ == '__main__':
-    print pdf_to_text_with_ocr('../../Downloads/image_pdf.pdf', None, None)['text']
-#end if
