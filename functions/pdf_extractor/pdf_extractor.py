@@ -103,7 +103,7 @@ def pdf_to_text_with_ocr(doc_path, event, context):
     for page in xrange(1, num_pages + 1):
         page_text_uri = text_uri + '-{}'.format(page)
         lambda_client.invoke(
-            FunctionName='pdf-extractor_text_extractor',
+            FunctionName=os.environ['LAMBDA_FUNCTION_NAME'],
             InvocationType='Event',
             LogType='None',
             Payload=json.dumps(
