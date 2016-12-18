@@ -5,7 +5,7 @@ from datetime import datetime, time
 import logging
 import os
 import subprocess
-from tempfile import NamedTemporaryFile, mkdtemp
+from tempfile import NamedTemporaryFile
 
 from PyPDF2 import PdfFileReader
 import xlrd
@@ -67,7 +67,7 @@ def pdf_to_text(doc_path, event, context):
     try:
         subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
         text_path = os.path.splitext(doc_path)[0] + '.txt'
-    except subprocess.CalledProcessError as e: return dict(success=False, reason=u'Exception while executing {}: {}'.format(cmdline, e, e.output))
+    except subprocess.CalledProcessError as e: return dict(success=False, reason=u'Exception while executing {}: {} (output={})'.format(cmdline, e, e.output))
 
     with codecs.open(text_path, 'r', 'utf-8', errors='ignore') as f:
         text = f.read()
@@ -97,16 +97,28 @@ def pdf_to_text_with_ocr_single_page(doc_path, event, context):
 
     cmdline = [os.path.join(BIN_DIR, 'gs-920-linux_x86_64'), '-sDEVICE=png16m', '-dFirstPage={}'.format(pageno), '-dLastPage='.format(pageno), '-dINTERPOLATE', '-r300', '-o', image_page_path, '-dNOPAUSE', '-dSAFER', '-c', '67108864', 'setvmthreshold', '-dGraphicsAlphaBits=4', '-dTextAlphaBits=4', '-f', doc_path]
     try: subprocess.check_output(cmdline, shell=False, stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as e: return dict(success=False, reason=u'Exception while executing {}: {}'.format(cmdline, e, e.output))
+    except subprocess.CalledProcessError as e: return dict(success=False, reason=u'Exception while executing {}: {} (output={})'.format(cmdline, e, e.output))
 
     return image_to_text(image_page_path, event, context)
 #end def
 
 
 def image_to_text(doc_path, event, context):
+    _, ext = os.path.splitext(doc_path)
+    if ext not in ['.png', '.tiff']:  # convert to B&W tiff
+        cmdline = [os.path.join(BIN_DIR, 'magick'), '-depth', '8', '-density', '300', doc_path, '-threshold', '50%', '-channel', 'r', '-separate', doc_path + '.tiff']
+        try: subprocess.check_output(cmdline, stderr=subprocess.STDOUT, shell=False, env=dict(LD_LIBRARY_PATH=os.path.join(LIB_DIR, 'tesseract')))
+        except subprocess.CalledProcessError as e: return dict(success=False, reason=u'Exception while executing {}: {} (output={})'.format(cmdline, e, e.output))
+
+        # Using PIL takes up more memory but faster.
+        # im = Image.open(doc_path)
+        # doc_path += '.tiff'
+        # im.save(doc_path, dpi=(300, 300))
+    #end if
+
     cmdline = [os.path.join(BIN_DIR, 'tesseract'), doc_path, doc_path, '-l', 'eng', '-psm', '6', '--tessdata-dir', os.path.join(LIB_DIR, 'tesseract')]
-    try: subprocess.check_call(cmdline, stderr=subprocess.STDOUT, shell=False, env=dict(LD_LIBRARY_PATH=os.path.join(LIB_DIR, 'tesseract')))
-    except subprocess.CalledProcessError as e: return dict(success=False, reason=u'Exception while executing {}: {}'.format(cmdline, e, e.output))
+    try: subprocess.check_output(cmdline, stderr=subprocess.STDOUT, shell=False, env=dict(LD_LIBRARY_PATH=os.path.join(LIB_DIR, 'tesseract')))
+    except subprocess.CalledProcessError as e: return dict(success=False, reason=u'Exception while executing {}: {} (output={})'.format(cmdline, e, e.output))
     with codecs.open(doc_path + '.txt', 'r', 'utf-8') as f:
         text = f.read().strip()
 
@@ -175,6 +187,11 @@ PARSE_FUNCS = {
     '.doc': doc_to_text,
     '.xls': xls_to_text,
     '.xlsx': xls_to_text,
+    '.png': image_to_text,
+    '.tiff': image_to_text,
+    '.jpg': image_to_text,
+    '.gif': image_to_text,
+    '.jpeg': image_to_text,
 }
 
 if __name__ == '__main__':

@@ -2,5 +2,6 @@
     "name": "text_extractor",
     "description": "Extract text from various document formats.",
     "handler": "text_extractor.extract",
-    "timeout": 300
+    "timeout": 300,
+    "memory": 256
 }
