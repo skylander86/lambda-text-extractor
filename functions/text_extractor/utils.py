@@ -9,8 +9,8 @@ import boto3
 s3_client = boto3.client('s3')
 
 
-def download_file(event):
-    o = urlparse(event['doc_uri'])
+def download_file(uri):
+    o = urlparse(uri)
 
     if o.scheme == 's3':
         bucket, doc_key = o.netloc, o.path.lstrip('/')
@@ -30,8 +30,8 @@ def download_file(event):
 #end def
 
 
-def upload_file(event, text_path):
-    o = urlparse(event['text_uri'])
+def upload_file(uri, text_path):
+    o = urlparse(uri)
 
     if o.scheme == 's3':
         bucket, doc_key = o.netloc, o.path.lstrip('/')
