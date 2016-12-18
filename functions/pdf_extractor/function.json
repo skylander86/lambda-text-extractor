@@ -1,6 +1,6 @@
 {
-    "name": "text_extractor",
+    "name": "pdf_extractor",
     "description": "Extract text from various document formats.",
-    "handler": "text_extractor.extract",
+    "handler": "pdf_extractor.extract",
     "memory": 256
 }

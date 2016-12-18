@@ -10,6 +10,7 @@ from tempfile import NamedTemporaryFile
 from time import sleep
 
 import boto3
+import pptx
 from PyPDF2 import PdfFileReader
 import xlrd
 
@@ -233,16 +234,35 @@ def xls_to_text(doc_path, event, context):
 #end def
 
 
+def pptx_to_text(doc_path, event, context):
+    prs = pptx.Presentation(doc_path)
+
+    # text_runs will be populated with a list of strings,
+    # one for each text run in presentation
+    text_runs = []
+
+    for slide in prs.slides:
+        for shape in slide.shapes:
+            if not shape.has_text_frame: continue
+            text_runs += [run.text for paragraph in shape.text_frame.paragraphs for run in paragraph.runs]
+        #end for
+    #end for
+
+    return dict(success=True, text=u'\n\n'.join(text_runs))
+#end def
+
+
 PARSE_FUNCS = {
     '.pdf': pdf_to_text,
-    '.rtf': rtf_to_text,
-    '.doc': doc_to_text,
-    '.xls': xls_to_text,
-    '.xlsx': xls_to_text,
     '.png': image_to_text,
     '.tiff': image_to_text,
     '.jpg': image_to_text,
     '.jpeg': image_to_text,
+    '.rtf': rtf_to_text,
+    '.doc': doc_to_text,
+    '.xls': xls_to_text,
+    '.xlsx': xls_to_text,
+    '.pptx': pptx_to_text,
 }
 
 if __name__ == '__main__':
