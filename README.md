@@ -126,9 +126,11 @@ The shared libraries required are a subset of that for Tesseract, hence we will 
 
 ### lxml
 
-[lxml](http://lxml.de/) library is used for many of the XML formats.
+[lxml](http://lxml.de/) library is used for many of the XML formats. 
+We use the pre-compiled for AWS Lambda lxml package from [lambda-lxml-base](https://github.com/cjpetrus/lambda-lxml-base)
 
-    sudo pip install lxml
-    
+### Pillow
 
-https://github.com/cjpetrus/lambda-lxml-base/blob/master/lxml_amazon_binaries.zip
+[Pillow]() library is used by python-pptx for parsing Microsoft Powerpoint files.
+We use the pre-compiled PIL libraries from [aws-lambda-pillow](https://github.com/jDmacD/aws-lambda-pillow/).
+

@@ -1,0 +1,6 @@
+{
+    "name": "office_extractor",
+    "description": "Extract text from Microsoft Office files.",
+    "handler": "office_extractor.extract",
+    "memory": 128
+}
