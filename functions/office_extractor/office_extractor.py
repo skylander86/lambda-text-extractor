@@ -1,14 +1,22 @@
 # -*- coding: utf-8 -*-
 
+import codecs
 from datetime import datetime, time
 import logging
 import os
 import subprocess
 from tempfile import NamedTemporaryFile
 
+from docx import Document
+from docx.table import Table
+from docx.text.paragraph import Paragraph
+from docx.oxml.table import CT_Tbl
+from docx.oxml.text.paragraph import CT_P
+
 import lxml.html
 from lxml import etree
-# import pptx
+
+import pptx
 import xlrd
 
 from utils import download_file, upload_file
@@ -71,9 +79,25 @@ def doc_to_text(doc_path, event, context):
     try:
         text = subprocess.check_output(cmdline, shell=False, stderr=subprocess.STDOUT, env=dict(ANTIWORDHOME=os.path.join(LIB_DIR, 'antiword')))
         text = text.decode('utf-8', errors='ignore')
+        text = text.strip()
     except subprocess.CalledProcessError as e: return dict(success=False, reason=u'Exception while executing {}: {} (output={})'.format(cmdline, e, e.output))
 
-    return dict(success=True, text=text.strip())
+    return dict(success=True, text=text)
+#end def
+
+
+def docx_to_text(doc_path, event, context):
+    doc = Document(doc_path)
+    doc_body = doc.element.body
+    blocks = []
+    for child in doc_body.iterchildren():
+        if isinstance(child, CT_P): blocks.append(Paragraph(child, doc_body).text)
+        elif isinstance(child, CT_Tbl): blocks += [cell.text for row in Table(child, doc_body).rows for cell in row.cells]
+    #end for
+
+    text = u'\n\n'.join(blocks).strip()
+
+    return dict(success=True, text=text)
 #end def
 
 
@@ -147,12 +171,32 @@ def html_to_text(doc_path, event, context):
 #end def
 
 
+def text_to_text(doc_path, event, context):
+    with codecs.open(doc_path, 'r', 'utf-8', errors='ignore') as f:
+        text = f.read()
+    return dict(success=True, text=text)
+#end def
+
+
+def csv_to_text(doc_path, event, context):
+    with codecs.open(doc_path, 'r', 'utf-8', errors='ignore') as f:
+        text = f.read()
+        text = text.replace(u',', u', ')
+    #end with
+
+    return dict(success=True, text=text)
+#end def
+
+
 PARSE_FUNCS = {
-    '.rtf': rtf_to_text,
     '.doc': doc_to_text,
+    '.docx': docx_to_text,
+    '.rtf': rtf_to_text,
     '.xls': xls_to_text,
     '.xlsx': xls_to_text,
     '.pptx': pptx_to_text,
     '.html': html_to_text,
     '.htm': html_to_text,
+    '.txt': text_to_text,
+    '.csv': csv_to_text,
 }
