@@ -21,6 +21,12 @@ Configure `project.json` with the account specific settings (you will also need 
 
 to deploy the lambda functions. :)
 
+You need to make sure your IAM role has `lambda:InvokeFunction` permissions.
+
+### Invoking the AWS Lambda
+
+
+
 ## Using it without AWS Lambda
 
 ## Notes on building / packaging for AWS Lambda execution environment
