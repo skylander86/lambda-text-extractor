@@ -4,12 +4,12 @@
 
 Due to the size of code and dependencies (and AWS deployment limits), it is split into two functions.
 
-`pdf_extractor` supports extracting text from
+[`pdf_extractor`](functions/pdf_extractor) supports extracting text from
 
 - "Text" PDF files (using [pdftotext](http://www.foolabs.com/xpdf/download.html)),
 - Images (TIFF, JPEG, PNG) and "image" PDF (using [Ghostscript](https://ghostscript.com/download/gsdnld.html) 9.20 for PDF manipulation, [ImageMagick](https://www.imagemagick.org/) 7.0.3-10 for image handling, and [Tesseract](https://github.com/tesseract-ocr/tesseract/) 3.05.00dev for OCR)
 
-while `office_extractor` handles text extraction from
+while [`office_extractor`](functions/office_extractor/) handles text extraction from
 
 - Microsoft Word 2, 6, 7, 97, 2000, 2002 and 2003 (using [Antiword](http://www.winfield.demon.nl/)),
 - Microsoft Word 2007 OpenXML files (using [python-docx](https://github.com/python-openxml/python-docx)),
@@ -35,11 +35,34 @@ You need to make sure your IAM role has `lambda:InvokeFunction` permissions, and
 
 ### Invoking the AWS Lambda
 
+The `extract` method in both `pdf_extractor` and `office_extractor` expects an `event` with
 
+- `doc_uri`: An S3 URI containing the document to extract text from, i.e., `s3://bucket/key.pdf`.
+- `text_uri`: An S3 URI where the extracted text will be stored, i.e., `s3://bucket/key.txt`.
 
-## Using it without AWS Lambda
+### PDF parsing with OCR
 
-## Notes on building / packaging for AWS Lambda execution environment
+Due to the slow nature of OCR on images and AWS Lambda's 300 seconds execution limit, we used a hack (i.e., another lambda invocation) to OCR the pages of a PDF in parallel, while using S3 as our temporary store.
+When we determine that a PDF needs to be processed using OCR (i.e., standard text extraction yield < 512 bytes), we invoke `pdf_extractor.extract` with a special `event`:
+```json
+{
+  "doc_uri": "s3://docbot-test-lambda/image.pdf",
+  "text_uri": "s3://docbot-test-lambda/image.txt-1",
+  "page": 5,
+  "force_ocr": true
+}
+```
+where `page` refers to the page of the original PDF that we want to extract text from.
+In the new lambda invocation, we use Ghostscript to convert that particular page to PNG and OCR using Tesseract to extract the text.
+
+The original calling lambda function will wait and poll S3 at 1 second intervals for extracted text.
+When all pages have been processed or when there is less than 5 seconds remaining on our clock, we will combine the pages' text that we have and return.
+Missing pages will be logged as a warning to the default logger.
+If anybody knows of a better pattern for processing PDFs, do feel free to submit a pull request.
+
+Note that the `force_ocr` field can be used with any PDF to use OCR text extraction instead of `pdftotext`.
+
+## Building executables and modules for the AWS Lambda execution environment
 
 The executables, configs, and libraries in `bin-linux_x64` and `lib-linux_x64` has been compiled on an EC2 instance with a fresh install of `amzn-ami-hvm-2016.03.3.x86_64-gp2` AMI (this is AWS Lambda's execution AMI as of 12/17/2016).
 Below are notes on how we obtained these binaries.
