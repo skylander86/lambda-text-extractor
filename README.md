@@ -19,8 +19,6 @@ while [`office_extractor`](functions/office_extractor/) handles text extraction 
 - Rich Text Format (using [UnRTF](https://www.gnu.org/software/unrtf/) v0.21.9),
 - CSV and Text files (duh)
 
-The extracted text will always be encoded in UTF-8.
-
 ## Deploying on AWS Lambda
 
 We use [apex](http://apex.run/) for our development toolchain to manage AWS lambda functions.
@@ -39,6 +37,7 @@ The `extract` method in both `pdf_extractor` and `office_extractor` expects an `
 
 - `doc_uri`: An S3 URI containing the document to extract text from, i.e., `s3://bucket/key.pdf`.
 - `text_uri`: An S3 URI where the extracted text will be stored, i.e., `s3://bucket/key.txt`.
+- `text_encoding` (optional): The text encoding to use for extracted text. Defaults to `utf-8`.
 
 ### PDF parsing with OCR
 
