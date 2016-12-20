@@ -14,7 +14,10 @@ from docx.oxml.table import CT_Tbl
 from docx.oxml.text.paragraph import CT_P
 
 import lxml.html
-from lxml import etree
+
+from odf.opendocument import load as odf_load
+from odf import text as odf_text
+from odf import teletype as odf_teletype
 
 import pptx
 import xlrd
@@ -165,7 +168,11 @@ def pptx_to_text(doc_path, event, context):
 
 def html_to_text(doc_path, event, context):
     document = lxml.html.parse(doc_path)
-    text = u'\n'.join(etree.XPath("//text()")(document))
+    for tag in ['script', 'style']:
+        for elem in document.xpath('//' + tag):
+            elem.drop_tree()
+
+    text = u'\n'.join(document.xpath("//*//text()"))
 
     return dict(success=True, text=text)
 #end def
@@ -188,6 +195,16 @@ def csv_to_text(doc_path, event, context):
 #end def
 
 
+def odf_to_text(doc_path, event, context):
+    doc = odf_load(doc_path)
+    paragraphs = []
+    for p in doc.getElementsByType(odf_text.P):
+        paragraphs.append(odf_teletype.extractText(p))
+
+    return dict(success=True, text=u'\n'.join(paragraphs))
+#end def
+
+
 PARSE_FUNCS = {
     '.doc': doc_to_text,
     '.docx': docx_to_text,
@@ -199,4 +216,12 @@ PARSE_FUNCS = {
     '.htm': html_to_text,
     '.txt': text_to_text,
     '.csv': csv_to_text,
+    '.odt': odf_to_text,
+    '.ott': odf_to_text,
+    '.oth': odf_to_text,
+    '.odm': odf_to_text,
+    '.ods': odf_to_text,
+    '.ots': odf_to_text,
+    '.odp': odf_to_text,
+    '.otp': odf_to_text,
 }

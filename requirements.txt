@@ -6,3 +6,4 @@ python-pptx
 python-docx
 pillow
 lxml
+odfpy
