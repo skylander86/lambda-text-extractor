@@ -14,7 +14,6 @@ from docx.oxml.table import CT_Tbl
 from docx.oxml.text.paragraph import CT_P
 
 import lxml.html
-from lxml import etree
 
 from odf.opendocument import load as odf_load
 from odf import text as odf_text
@@ -169,7 +168,11 @@ def pptx_to_text(doc_path, event, context):
 
 def html_to_text(doc_path, event, context):
     document = lxml.html.parse(doc_path)
-    text = u'\n'.join(etree.XPath("//*[not self::script and not self::style]//text()")(document))
+    for tag in ['script', 'style']:
+        for elem in document.xpath('//' + tag):
+            elem.drop_tree()
+
+    text = u'\n'.join(document.xpath("//*//text()"))
 
     return dict(success=True, text=text)
 #end def
