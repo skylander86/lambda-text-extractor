@@ -169,7 +169,7 @@ def pptx_to_text(doc_path, event, context):
 
 def html_to_text(doc_path, event, context):
     document = lxml.html.parse(doc_path)
-    text = u'\n'.join(etree.XPath("//text()")(document))
+    text = u'\n'.join(etree.XPath("//*[not self::script and not self::style]//text()")(document))
 
     return dict(success=True, text=text)
 #end def
