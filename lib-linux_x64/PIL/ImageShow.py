@@ -38,25 +38,23 @@ def register(viewer, order=1):
         _viewers.insert(0, viewer)
 
 
-##
-# Displays a given image.
-#
-# @param image An image object.
-# @param title Optional title.  Not all viewers can display the title.
-# @param **options Additional viewer options.
-# @return True if a suitable viewer was found, false otherwise.
-
 def show(image, title=None, **options):
+    r"""
+    Display a given image.
+
+    :param image: An image object.
+    :param title: Optional title.  Not all viewers can display the title.
+    :param \**options: Additional viewer options.
+    :returns: True if a suitable viewer was found, false otherwise.
+    """
     for viewer in _viewers:
         if viewer.show(image, title=title, **options):
             return 1
     return 0
 
 
-##
-# Base class for viewers.
-
 class Viewer(object):
+    """Base class for viewers."""
 
     # main api
 
@@ -71,7 +69,7 @@ class Viewer(object):
             # FIXME: auto-contrast if max() > 255?
         else:
             base = Image.getmodebase(image.mode)
-        if base != image.mode and image.mode != "1":
+        if base != image.mode and image.mode != "1" and image.mode != "RGBA":
             image = image.convert(base)
 
         return self.show_image(image, **options)
@@ -79,24 +77,25 @@ class Viewer(object):
     # hook methods
 
     format = None
+    options = {}
 
     def get_format(self, image):
-        # return format name, or None to save as PGM/PPM
+        """Return format name, or None to save as PGM/PPM"""
         return self.format
 
     def get_command(self, file, **options):
         raise NotImplementedError
 
     def save_image(self, image):
-        # save to temporary file, and return filename
-        return image._dump(format=self.get_format(image))
+        """Save to temporary file, and return filename"""
+        return image._dump(format=self.get_format(image), **self.options)
 
     def show_image(self, image, **options):
-        # display given image
+        """Display given image"""
         return self.show_file(self.save_image(image), **options)
 
     def show_file(self, file, **options):
-        # display given file
+        """Display given file"""
         os.system(self.get_command(file, **options))
         return 1
 
@@ -117,7 +116,8 @@ if sys.platform == "win32":
 elif sys.platform == "darwin":
 
     class MacViewer(Viewer):
-        format = "BMP"
+        format = "PNG"
+        options = {'compress_level': 1}
 
         def get_command(self, file, **options):
             # on darwin open returns immediately resulting in the temp
@@ -139,12 +139,14 @@ else:
             return None
         for dirname in path.split(os.pathsep):
             filename = os.path.join(dirname, executable)
-            if os.path.isfile(filename):
-                # FIXME: make sure it's executable
+            if os.path.isfile(filename) and os.access(filename, os.X_OK):
                 return filename
         return None
 
     class UnixViewer(Viewer):
+        format = "PNG"
+        options = {'compress_level': 1}
+
         def show_file(self, file, **options):
             command, executable = self.get_command_ex(file, **options)
             command = "(%s %s; rm -f %s)&" % (command, quote(file),

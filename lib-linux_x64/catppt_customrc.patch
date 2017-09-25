@@ -1,0 +1,18 @@
+--- catdoc-0.95/src/catppt.c	2012-10-02 21:16:53.000000000 +0000
++++ catppt_customrc.c	2017-08-10 06:27:52.831665481 +0000
+@@ -57,13 +57,8 @@
+ 	int i;
+ 	char *tempname;
+ 	read_config_file(SYSTEMRC);
+-#ifdef USERRC
+-	tempname=find_file(strdup(USERRC),getenv("HOME"));
+-	if (tempname) {
+-		read_config_file(tempname);
+-		free(tempname);
+-	}
+-#endif
++	tempname = getenv("CATDOCRC_PATH");
++	if (tempname) read_config_file(tempname);
+ #ifdef HAVE_LANGINFO
+ 	get_locale_charset();
+ #endif

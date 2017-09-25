@@ -2,6 +2,9 @@
 
 """
 Placeholder-related objects, specific to shapes having a `p:ph` element.
+A placeholder has distinct behaviors depending on whether it appears on
+a slide, layout, or master. Hence there is a non-trivial class inheritance
+structure.
 """
 
 from __future__ import (
@@ -9,7 +12,6 @@ from __future__ import (
 )
 
 from .autoshape import Shape
-from .base import BaseShape
 from ..enum.shapes import MSO_SHAPE_TYPE, PP_PLACEHOLDER
 from .graphfrm import GraphicFrame
 from ..oxml.shapes.graphfrm import CT_GraphicalObjectFrame
@@ -23,7 +25,9 @@ class _InheritsDimensions(object):
     Mixin class that provides inherited dimension behavior. Specifically,
     left, top, width, and height report the value from the layout placeholder
     where they would have otherwise reported |None|. This behavior is
-    distinctive to placeholders.
+    distinctive to placeholders. :meth:`_base_placeholder` must be overridden
+    by all subclasses to provide lookup of the appropriate base placeholder
+    to inherit from.
     """
     @property
     def height(self):
@@ -86,6 +90,15 @@ class _InheritsDimensions(object):
     def width(self, value):
         self._element.cx = value
 
+    @property
+    def _base_placeholder(self):
+        """
+        Return the layout or master placeholder shape this placeholder
+        inherits from. Not to be confused with an instance of
+        |BasePlaceholder| (necessarily).
+        """
+        raise NotImplementedError('Must be implemented by all subclasses.')
+
     def _effective_value(self, attr_name):
         """
         The effective value of *attr_name* on this placeholder shape; its
@@ -101,33 +114,17 @@ class _InheritsDimensions(object):
 
     def _inherited_value(self, attr_name):
         """
-        The attribute value, e.g. 'width' of the layout placeholder this
-        slide placeholder inherits from
+        Return the attribute value, e.g. 'width' of the base placeholder this
+        placeholder inherits from.
         """
-        layout_placeholder = self._layout_placeholder
-        if layout_placeholder is None:
+        base_placeholder = self._base_placeholder
+        if base_placeholder is None:
             return None
-        inherited_value = getattr(layout_placeholder, attr_name)
+        inherited_value = getattr(base_placeholder, attr_name)
         return inherited_value
 
-    @property
-    def _layout_placeholder(self):
-        """
-        The layout placeholder shape this slide placeholder inherits from
-        """
-        layout, idx = self._slide_layout, self._element.ph_idx
-        return layout.placeholders.get(idx=idx)
 
-    @property
-    def _slide_layout(self):
-        """
-        The slide layout for this placeholder's slide.
-        """
-        slide_part = self.part
-        return slide_part.slide_layout
-
-
-class _BaseSlidePlaceholder(_InheritsDimensions, BaseShape):
+class _BaseSlidePlaceholder(_InheritsDimensions, Shape):
     """
     Base class for placeholders on slides. Provides common behaviors such as
     inherited dimensions.
@@ -148,6 +145,16 @@ class _BaseSlidePlaceholder(_InheritsDimensions, BaseShape):
         Read-only.
         """
         return MSO_SHAPE_TYPE.PLACEHOLDER
+
+    @property
+    def _base_placeholder(self):
+        """
+        Return the layout placeholder this slide placeholder inherits from.
+        Not to be confused with an instance of |BasePlaceholder|
+        (necessarily).
+        """
+        layout, idx = self.part.slide_layout, self._element.ph_idx
+        return layout.placeholders.get(idx=idx)
 
     def _replace_placeholder_with(self, element):
         """
@@ -203,7 +210,7 @@ class BasePlaceholder(Shape):
         return self._sp.ph_sz
 
 
-class LayoutPlaceholder(BasePlaceholder):
+class LayoutPlaceholder(_InheritsDimensions, Shape):
     """
     Placeholder shape on a slide layout, providing differentiated behavior
     for slide layout placeholders, in particular, inheriting shape properties
@@ -211,72 +218,11 @@ class LayoutPlaceholder(BasePlaceholder):
     exists.
     """
     @property
-    def height(self):
+    def _base_placeholder(self):
         """
-        The effective height of this placeholder shape; its directly-applied
-        height if it has one, otherwise the height of its parent master
-        placeholder.
+        Return the master placeholder this layout placeholder inherits from.
         """
-        return self._direct_or_inherited_value('height')
-
-    @property
-    def left(self):
-        """
-        The effective left of this placeholder shape; its directly-applied
-        left if it has one, otherwise the left of its parent master
-        placeholder.
-        """
-        return self._direct_or_inherited_value('left')
-
-    @property
-    def top(self):
-        """
-        The effective top of this placeholder shape; its directly-applied
-        top if it has one, otherwise the top of its parent master
-        placeholder.
-        """
-        return self._direct_or_inherited_value('top')
-
-    @property
-    def width(self):
-        """
-        The effective width of this placeholder shape; its directly-applied
-        width if it has one, otherwise the width of its parent master
-        placeholder.
-        """
-        return self._direct_or_inherited_value('width')
-
-    def _direct_or_inherited_value(self, attr_name):
-        """
-        The effective value of *attr_name* on this placeholder shape; its
-        directly-applied value if it has one, otherwise the value on the
-        master placeholder it inherits from.
-        """
-        directly_applied_value = getattr(
-            super(LayoutPlaceholder, self), attr_name
-        )
-        if directly_applied_value is not None:
-            return directly_applied_value
-        inherited_value = self._inherited_value(attr_name)
-        return inherited_value
-
-    def _inherited_value(self, attr_name):
-        """
-        The attribute value, e.g. 'width' of the parent master placeholder of
-        this placeholder shape
-        """
-        master_placeholder = self._master_placeholder
-        if master_placeholder is None:
-            return None
-        inherited_value = getattr(master_placeholder, attr_name)
-        return inherited_value
-
-    @property
-    def _master_placeholder(self):
-        """
-        The master placeholder shape this layout placeholder inherits from.
-        """
-        inheritee_ph_type = {
+        base_ph_type = {
             PP_PLACEHOLDER.BODY:         PP_PLACEHOLDER.BODY,
             PP_PLACEHOLDER.CHART:        PP_PLACEHOLDER.BODY,
             PP_PLACEHOLDER.BITMAP:       PP_PLACEHOLDER.BODY,
@@ -291,21 +237,9 @@ class LayoutPlaceholder(BasePlaceholder):
             PP_PLACEHOLDER.SUBTITLE:     PP_PLACEHOLDER.BODY,
             PP_PLACEHOLDER.TABLE:        PP_PLACEHOLDER.BODY,
             PP_PLACEHOLDER.TITLE:        PP_PLACEHOLDER.TITLE,
-        }[self.ph_type]
-        slide_master = self._slide_master
-        master_placeholder = slide_master.placeholders.get(
-            inheritee_ph_type, None
-        )
-        return master_placeholder
-
-    @property
-    def _slide_master(self):
-        """
-        The slide master this placeholder inherits from.
-        """
-        slide_layout = self.part
-        slide_master = slide_layout.slide_master
-        return slide_master
+        }[self._element.ph_type]
+        slide_master = self.part.slide_master
+        return slide_master.placeholders.get(base_ph_type, None)
 
 
 class MasterPlaceholder(BasePlaceholder):
@@ -314,7 +248,24 @@ class MasterPlaceholder(BasePlaceholder):
     """
 
 
-class SlidePlaceholder(_InheritsDimensions, Shape):
+class NotesSlidePlaceholder(_InheritsDimensions, Shape):
+    """
+    Placeholder shape on a notes slide. Inherits shape properties from the
+    placeholder on the notes master that has the same type (e.g. 'body').
+    """
+    @property
+    def _base_placeholder(self):
+        """
+        Return the notes master placeholder this notes slide placeholder
+        inherits from, or |None| if no placeholder of the matching type is
+        present.
+        """
+        notes_master = self.part.notes_master
+        ph_type = self.element.ph_type
+        return notes_master.placeholders.get(ph_type=ph_type)
+
+
+class SlidePlaceholder(_BaseSlidePlaceholder):
     """
     Placeholder shape on a slide. Inherits shape properties from its
     corresponding slide layout placeholder.
@@ -349,7 +300,7 @@ class ChartPlaceholder(_BaseSlidePlaceholder):
         Return a newly created `p:graphicFrame` element having the specified
         position and size and containing the chart identified by *rId*.
         """
-        id_, name = self.id, self.name
+        id_, name = self.shape_id, self.name
         return CT_GraphicalObjectFrame.new_chart_graphicFrame(
             id_, name, rId, x, y, cx, cy
         )
@@ -381,8 +332,8 @@ class PicturePlaceholder(_BaseSlidePlaceholder):
         its layout placeholder.
         """
         rId, desc, image_size = self._get_or_add_image(image_file)
-        id_, name = self.id, self.name
-        pic = CT_Picture.new_ph_pic(id_, name, desc, rId)
+        shape_id, name = self.shape_id, self.name
+        pic = CT_Picture.new_ph_pic(shape_id, name, desc, rId)
         pic.crop_to_fit(image_size, (self.width, self.height))
         return pic
 
@@ -413,6 +364,13 @@ class PlaceholderPicture(_InheritsDimensions, Picture):
     """
     Placeholder shape populated with a picture.
     """
+    @property
+    def _base_placeholder(self):
+        """
+        Return the layout placeholder this picture placeholder inherits from.
+        """
+        layout, idx = self.part.slide_layout, self._element.ph_idx
+        return layout.placeholders.get(idx=idx)
 
 
 class TablePlaceholder(_BaseSlidePlaceholder):
@@ -444,7 +402,8 @@ class TablePlaceholder(_BaseSlidePlaceholder):
         of this placeholder and having its same width. The table's height is
         determined by the number of rows.
         """
-        id_, name, height = self.id, self.name, Emu(rows*370840)
+        shape_id, name, height = self.shape_id, self.name, Emu(rows*370840)
         return CT_GraphicalObjectFrame.new_table_graphicFrame(
-            id_, name, rows, cols, self.left, self.top, self.width, height
+            shape_id, name, rows, cols, self.left, self.top, self.width,
+            height
         )

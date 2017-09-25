@@ -6,6 +6,8 @@ Shared oxml objects for charts.
 
 from __future__ import absolute_import, print_function, unicode_literals
 
+from .. import parse_xml
+from ..ns import nsdecls
 from ..simpletypes import (
     ST_LayoutMode, XsdBoolean, XsdDouble, XsdString, XsdUnsignedInt
 )
@@ -20,6 +22,28 @@ class CT_Boolean(BaseOxmlElement):
     Common complex type used for elements having a True/False value.
     """
     val = OptionalAttribute('val', XsdBoolean, default=True)
+
+
+class CT_Boolean_Explicit(BaseOxmlElement):
+    """Always spells out the `val` attribute, e.g. `val=1`.
+
+    At least one boolean element is improperly interpreted by one or more
+    versions of PowerPoint. The `c:overlay` element is interpreted as |False|
+    when no `val` attribute is present, contrary to the behavior described in
+    the schema. A remedy for this is to interpret a missing `val` attribute
+    as |True| (consistent with the spec), but always write the attribute
+    whenever there is occasion for changing the element.
+    """
+    _val = OptionalAttribute('val', XsdBoolean, default=True)
+
+    @property
+    def val(self):
+        return self._val
+
+    @val.setter
+    def val(self, value):
+        val_str = '1' if bool(value) is True else '0'
+        self.set('val', val_str)
 
 
 class CT_Double(BaseOxmlElement):
@@ -112,6 +136,48 @@ class CT_NumFmt(BaseOxmlElement):
     sourceLinked = OptionalAttribute('sourceLinked', XsdBoolean)
 
 
+class CT_Title(BaseOxmlElement):
+    """`c:title` custom element class."""
+
+    _tag_seq = (
+        'c:tx', 'c:layout', 'c:overlay', 'c:spPr', 'c:txPr', 'c:extLst'
+    )
+    tx = ZeroOrOne('c:tx', successors=_tag_seq[1:])
+    spPr = ZeroOrOne('c:spPr', successors=_tag_seq[4:])
+    del _tag_seq
+
+    def get_or_add_tx_rich(self):
+        """Return `c:tx/c:rich`, newly created if not present.
+
+        Return the `c:rich` grandchild at `c:tx/c:rich`. Both the `c:tx` and
+        `c:rich` elements are created if not already present. Any
+        `c:tx/c:strRef` element is removed. (Such an element would contain
+        a cell reference for the axis title text in the chart's Excel
+        worksheet.)
+        """
+        tx = self.get_or_add_tx()
+        tx._remove_strRef()
+        return tx.get_or_add_rich()
+
+    @property
+    def tx_rich(self):
+        """Return `c:tx/c:rich` or |None| if not present."""
+        richs = self.xpath('c:tx/c:rich')
+        if not richs:
+            return None
+        return richs[0]
+
+    @staticmethod
+    def new_title():
+        """Return "loose" `c:title` element containing default children."""
+        return parse_xml(
+            '<c:title %s>'
+            '  <c:layout/>'
+            '  <c:overlay val="0"/>'
+            '</c:title>' % nsdecls('c')
+        )
+
+
 class CT_Tx(BaseOxmlElement):
     """
     ``<c:tx>`` element containing the text for a label on a data point or
@@ -123,6 +189,7 @@ class CT_Tx(BaseOxmlElement):
     def _new_rich(self):
         rich = OxmlElement('c:rich')
         rich.append(OxmlElement('a:bodyPr'))
+        rich.append(OxmlElement('a:lstStyle'))
         rich.add_p()
         return rich
 

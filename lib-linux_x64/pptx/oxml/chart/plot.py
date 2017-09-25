@@ -7,7 +7,6 @@ Plot-related oxml objects.
 from __future__ import absolute_import, print_function, unicode_literals
 
 from .datalabel import CT_DLbls
-from ..ns import qn
 from ..simpletypes import (
     ST_BarDir, ST_BubbleScale, ST_GapAmount, ST_Grouping, ST_Overlap
 )
@@ -21,16 +20,47 @@ class BaseChartElement(BaseOxmlElement):
     Base class for barChart, lineChart, and other plot elements.
     """
     @property
+    def cat(self):
+        """
+        Return the `c:cat` element of the first series in this xChart, or
+        |None| if not present.
+        """
+        cats = self.xpath('./c:ser[1]/c:cat')
+        return cats[0] if cats else None
+
+    @property
+    def cat_pt_count(self):
+        """
+        Return the value of the `c:ptCount` descendent of this xChart
+        element. Its parent can be one of three element types. This value
+        represents the true number of (leaf) categories, although they might
+        not all have a corresponding `c:pt` sibling; a category with no label
+        does not get a `c:pt` element. Returns 0 if there is no `c:ptCount`
+        descendent.
+        """
+        cat_ptCounts = self.xpath('./c:ser//c:cat//c:ptCount')
+        if not cat_ptCounts:
+            return 0
+        return cat_ptCounts[0].val
+
+    @property
     def cat_pts(self):
         """
-        The sequence of ``<c:pt>`` elements under the ``<c:cat>`` element of
-        the first series in this xChart element, ordered by the value of
-        their ``idx`` attribute.
+        Return a sequence representing the `c:pt` elements under the `c:cat`
+        element of the first series in this xChart element. A category having
+        no value will have no corresponding `c:pt` element; |None| will
+        appear in that position in such cases. Items appear in `idx` order.
+        Only those in the first ``<c:lvl>`` element are included in the case
+        of multi-level categories.
         """
         cat_pts = self.xpath('./c:ser[1]/c:cat//c:lvl[1]/c:pt')
         if not cat_pts:
             cat_pts = self.xpath('./c:ser[1]/c:cat//c:pt')
-        return sorted(cat_pts, key=lambda pt: pt.idx)
+
+        cat_pt_dict = dict((pt.idx, pt) for pt in cat_pts)
+
+        return [cat_pt_dict.get(idx, None)
+                for idx in range(self.cat_pt_count)]
 
     @property
     def grouping_val(self):
@@ -48,21 +78,24 @@ class BaseChartElement(BaseOxmlElement):
 
     def iter_sers(self):
         """
-        Generate each ``<c:ser>`` child element in the order it appears.
+        Generate each ``<c:ser>`` child element in this xChart in
+        c:order/@val sequence (not document or c:idx order).
         """
-        for child in self.iterchildren():
-            if child.tag == qn('c:ser'):
-                yield child
+        def ser_order(ser):
+            return ser.order.val
+
+        return (ser for ser in sorted(self.xpath('./c:ser'), key=ser_order))
 
     @property
     def sers(self):
         """
-        Sequence of ``<c:ser>`` child elements in document order.
+        Sequence of ``<c:ser>`` child elements in this xChart in c:order/@val
+        sequence (not document or c:idx order).
         """
-        return list(self.iter_sers())
+        return tuple(self.iter_sers())
 
     def _new_dLbls(self):
-        return CT_DLbls.new_default()
+        return CT_DLbls.new_dLbls()
 
 
 class CT_Area3DChart(BaseChartElement):
@@ -140,6 +173,7 @@ class CT_BubbleChart(BaseChartElement):
         'c:extLst'
     )
     ser = ZeroOrMore('c:ser', successors=_tag_seq[2:])
+    dLbls = ZeroOrOne('c:dLbls', successors=_tag_seq[3:])
     bubble3D = ZeroOrOne('c:bubble3D', successors=_tag_seq[5:])
     bubbleScale = ZeroOrOne('c:bubbleScale', successors=_tag_seq[6:])
     del _tag_seq

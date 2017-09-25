@@ -20,8 +20,6 @@
 #      Access.c implementation.
 #
 
-from __future__ import print_function
-
 import logging
 import sys
 
@@ -53,6 +51,9 @@ class PyAccess(object):
         self.image = ffi.cast('unsigned char **', vals['image'])
         self.xsize = vals['xsize']
         self.ysize = vals['ysize']
+
+        # Keep pointer to im object to prevent dereferencing.
+        self._im = img.im
 
         # Debugging is polluting test traces, only useful here
         # when hacking on PyAccess
@@ -164,7 +165,7 @@ class _PyAccess8(PyAccess):
         try:
             # integer
             self.pixels[y][x] = min(color, 255)
-        except:
+        except TypeError:
             # tuple
             self.pixels[y][x] = min(color[0], 255)
 
@@ -181,7 +182,7 @@ class _PyAccessI16_N(PyAccess):
         try:
             # integer
             self.pixels[y][x] = min(color, 65535)
-        except:
+        except TypeError:
             # tuple
             self.pixels[y][x] = min(color[0], 65535)
 
@@ -269,7 +270,7 @@ class _PyAccessF(PyAccess):
         try:
             # not a tuple
             self.pixels[y][x] = color
-        except:
+        except TypeError:
             # tuple
             self.pixels[y][x] = color[0]
 
@@ -278,6 +279,7 @@ mode_map = {'1': _PyAccess8,
             'L': _PyAccess8,
             'P': _PyAccess8,
             'LA': _PyAccess32_2,
+            'La': _PyAccess32_2,
             'PA': _PyAccess32_2,
             'RGB': _PyAccess32_3,
             'LAB': _PyAccess32_3,
@@ -313,5 +315,3 @@ def new(img, readonly=False):
         logger.debug("PyAccess Not Implemented: %s", img.mode)
         return None
     return access_type(img, readonly)
-
-# End of file

@@ -1,0 +1,10 @@
+{
+    "name": "ocr",
+    "description": "[development] Extract text from PDF/image files using OCR.",
+    "timeout": 60,
+    "memory": 512,
+    "environment": {
+        "MERGE_SEARCHABLE_PDF_DURATION": "15",
+        "LOG_LEVEL": "DEBUG"
+    }
+}

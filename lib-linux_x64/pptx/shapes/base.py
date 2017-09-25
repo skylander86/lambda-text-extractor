@@ -4,9 +4,9 @@
 Base shape-related objects such as BaseShape.
 """
 
-from __future__ import absolute_import, print_function
-
-from warnings import warn
+from __future__ import (
+    absolute_import, division, print_function, unicode_literals
+)
 
 from ..action import ActionSetting
 from ..shared import ElementProxy
@@ -72,18 +72,6 @@ class BaseShape(object):
         return False
 
     @property
-    def has_textframe(self):
-        """
-        Deprecated. Use :attr:`has_text_frame` property instead.
-        """
-        msg = (
-            'Shape.has_textframe property is deprecated. Use .has_text_frame'
-            ' instead.'
-        )
-        warn(msg, UserWarning, stacklevel=2)
-        return self.has_text_frame
-
-    @property
     def height(self):
         """
         Read/write. Integer distance between top and bottom extents of shape
@@ -94,14 +82,6 @@ class BaseShape(object):
     @height.setter
     def height(self, value):
         self._element.cy = value
-
-    @property
-    def id(self):
-        """
-        Read-only positive integer identifying this shape. The id of a shape
-        is unique among all shapes on a slide.
-        """
-        return self._element.shape_id
 
     @property
     def is_placeholder(self):
@@ -165,6 +145,14 @@ class BaseShape(object):
     @rotation.setter
     def rotation(self, value):
         self._element.rot = value
+
+    @property
+    def shape_id(self):
+        """Read-only positive integer identifying this shape.
+
+        The id of a shape is unique among all shapes on a slide.
+        """
+        return self._element.shape_id
 
     @property
     def shape_type(self):

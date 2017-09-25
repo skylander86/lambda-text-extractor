@@ -9,12 +9,12 @@ from lxml import etree, html
 try:
     from bs4 import (
         BeautifulSoup, Tag, Comment, ProcessingInstruction, NavigableString,
-        Declaration, CData, Doctype)
+        Declaration, Doctype)
     _DECLARATION_OR_DOCTYPE = (Declaration, Doctype)
 except ImportError:
     from BeautifulSoup import (
         BeautifulSoup, Tag, Comment, ProcessingInstruction, NavigableString,
-        Declaration, CData)
+        Declaration)
     _DECLARATION_OR_DOCTYPE = Declaration
 
 
@@ -74,7 +74,7 @@ def _parse(source, beautifulsoup, makeelement, **bsargs):
             bsargs['convertEntities'] = 'html'
     if hasattr(beautifulsoup, "DEFAULT_BUILDER_FEATURES"):  # bs4
         if 'features' not in bsargs:
-            bsargs['features'] = ['html.parser']  # use Python html parser
+            bsargs['features'] = 'html.parser'  # use Python html parser
     tree = beautifulsoup(source, **bsargs)
     root = _convert_tree(tree, makeelement)
     # from ET: wrap the document in a html root element, if necessary
@@ -129,9 +129,13 @@ def _convert_tree(beautiful_soup_tree, makeelement):
     # may be a soup like '<meta><head><title>Hello</head><body>Hi
     # all<\p>'. In this example roots is a list containing meta, head
     # and body elements.
-    pre_root = beautiful_soup_tree.contents[:first_element_idx]
-    roots = beautiful_soup_tree.contents[first_element_idx:last_element_idx+1]
-    post_root = beautiful_soup_tree.contents[last_element_idx+1:]
+    if first_element_idx is None:
+        pre_root = post_root = []
+        roots = beautiful_soup_tree.contents
+    else:
+        pre_root = beautiful_soup_tree.contents[:first_element_idx]
+        roots = beautiful_soup_tree.contents[first_element_idx:last_element_idx+1]
+        post_root = beautiful_soup_tree.contents[last_element_idx+1:]
 
     # Reorganize so that there is one <html> root...
     if html_root is not None:
@@ -255,7 +259,7 @@ def _init_node_converters(makeelement):
 
     @converter(Comment)
     def convert_comment(bs_node, parent):
-        res = etree.Comment(bs_node)
+        res = html.HtmlComment(bs_node)
         if parent is not None:
             parent.append(res)
         return res
@@ -288,7 +292,14 @@ except ImportError:
     from htmlentitydefs import name2codepoint
 
 
-handle_entities = re.compile("&(\w+);").sub
+handle_entities = re.compile(r"&(\w+);").sub
+
+
+try:
+    unichr
+except NameError:
+    # Python 3
+    unichr = chr
 
 
 def unescape(string):

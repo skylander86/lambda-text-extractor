@@ -17,7 +17,7 @@
 # See the README file for information on usage and redistribution.
 #
 
-from PIL import Image
+from . import Image
 
 
 class HDC(object):
@@ -182,19 +182,9 @@ class Dib(object):
         """
         return self.image.tobytes()
 
-    def fromstring(self, *args, **kw):
-        raise Exception("fromstring() has been removed. " +
-                        "Please use frombytes() instead.")
-
-    def tostring(self, *args, **kw):
-        raise Exception("tostring() has been removed. " +
-                        "Please use tobytes() instead.")
-
-
-##
-# Create a Window with the given title size.
 
 class Window(object):
+    """Create a Window with the given title size."""
 
     def __init__(self, title="PIL", width=None, height=None):
         self.hwnd = Image.core.createwindow(
@@ -223,10 +213,8 @@ class Window(object):
         Image.core.eventloop()
 
 
-##
-# Create an image window which displays the given image.
-
 class ImageWindow(Window):
+    """Create an image window which displays the given image."""
 
     def __init__(self, image, title="PIL"):
         if not isinstance(image, Dib):

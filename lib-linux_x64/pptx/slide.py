@@ -11,7 +11,7 @@ from __future__ import (
 from .enum.shapes import PP_PLACEHOLDER
 from .shapes.shapetree import (
     LayoutPlaceholders, LayoutShapes, MasterPlaceholders, MasterShapes,
-    SlidePlaceholders, SlideShapes
+    NotesSlidePlaceholders, NotesSlideShapes, SlidePlaceholders, SlideShapes
 )
 from .shared import ParentedElementProxy, PartElementProxy
 from .util import lazyproperty
@@ -39,12 +39,143 @@ class _BaseSlide(PartElementProxy):
         self._element.cSld.name = new_value
 
 
+class _BaseMaster(_BaseSlide):
+    """
+    Base class for master objects such as |SlideMaster| and |NotesMaster|.
+    Provides access to placeholders and regular shapes.
+    """
+
+    __slots__ = ('_placeholders', '_shapes')
+
+    @lazyproperty
+    def placeholders(self):
+        """
+        Instance of |MasterPlaceholders| containing sequence of placeholder
+        shapes in this master, sorted in *idx* order.
+        """
+        return MasterPlaceholders(self._element.spTree, self)
+
+    @lazyproperty
+    def shapes(self):
+        """
+        Instance of |MasterShapes| containing sequence of shape objects
+        appearing on this slide.
+        """
+        return MasterShapes(self._element.spTree, self)
+
+
+class NotesMaster(_BaseMaster):
+    """
+    Proxy for the notes master XML document. Provides access to shapes, the
+    most commonly used of which are placeholders.
+    """
+
+    __slots__ = ()
+
+
+class NotesSlide(_BaseSlide):
+    """
+    Notes slide object. Provides access to slide notes placeholder and other
+    shapes on the notes handout page.
+    """
+
+    __slots__ = ('_placeholders', '_shapes')
+
+    def clone_master_placeholders(self, notes_master):
+        """
+        Selectively add placeholder shape elements from *notes_master* to the
+        shapes collection of this notes slide. Z-order of placeholders is
+        preserved. Certain placeholders (header, date, footer) are not
+        cloned.
+        """
+        def iter_cloneable_placeholders(notes_master):
+            """
+            Generate a reference to each placeholder in *notes_master* that
+            should be cloned to a notes slide when the a new notes slide is
+            created.
+            """
+            cloneable = (
+                PP_PLACEHOLDER.SLIDE_IMAGE,
+                PP_PLACEHOLDER.BODY,
+                PP_PLACEHOLDER.SLIDE_NUMBER,
+            )
+            for placeholder in notes_master.placeholders:
+                if placeholder.element.ph_type in cloneable:
+                    yield placeholder
+
+        shapes = self.shapes
+        for placeholder in iter_cloneable_placeholders(notes_master):
+            shapes.clone_placeholder(placeholder)
+
+    @property
+    def notes_placeholder(self):
+        """
+        Return the notes placeholder on this notes slide, the shape that
+        contains the actual notes text. Return |None| if no notes placeholder
+        is present; while this is probably uncommon, it can happen if the
+        notes master does not have a body placeholder, or if the notes
+        placeholder has been deleted from the notes slide.
+        """
+        for placeholder in self.placeholders:
+            if placeholder.placeholder_format.type == PP_PLACEHOLDER.BODY:
+                return placeholder
+        return None
+
+    @property
+    def notes_text_frame(self):
+        """
+        Return the text frame of the notes placeholder on this notes slide,
+        or |None| if there is no notes placeholder. This is a shortcut to
+        accommodate the common case of simply adding "notes" text to the
+        notes "page".
+        """
+        notes_placeholder = self.notes_placeholder
+        if notes_placeholder is None:
+            return None
+        return notes_placeholder.text_frame
+
+    @lazyproperty
+    def placeholders(self):
+        """
+        An instance of |NotesSlidePlaceholders| containing the sequence of
+        placeholder shapes in this notes slide.
+        """
+        return NotesSlidePlaceholders(self.element.spTree, self)
+
+    @lazyproperty
+    def shapes(self):
+        """
+        An instance of |NotesSlideShapes| containing the sequence of shape
+        objects appearing on this notes slide.
+        """
+        return NotesSlideShapes(self._element.spTree, self)
+
+
 class Slide(_BaseSlide):
     """
     Slide object. Provides access to shapes and slide-level properties.
     """
 
     __slots__ = ('_placeholders', '_shapes')
+
+    @property
+    def has_notes_slide(self):
+        """
+        Return True if this slide has a notes slide, False otherwise. A notes
+        slide is created by :attr:`.notes_slide` when one doesn't exist; use
+        this property to test for a notes slide without the possible side
+        effect of creating one.
+        """
+        return self.part.has_notes_slide
+
+    @property
+    def notes_slide(self):
+        """
+        Return the |NotesSlide| instance for this slide. If the slide does
+        not have a notes slide, one is created. The same single instance is
+        returned on each call.
+        """
+        return self.part.notes_slide
 
     @lazyproperty
     def placeholders(self):
@@ -162,7 +293,7 @@ class SlideLayout(_BaseSlide):
             PP_PLACEHOLDER.SLIDE_NUMBER
         )
         for ph in self.placeholders:
-            if ph.ph_type not in latent_ph_types:
+            if ph.element.ph_type not in latent_ph_types:
                 yield ph
 
     @lazyproperty
@@ -227,29 +358,14 @@ class SlideLayouts(ParentedElementProxy):
         return len(self._sldLayoutIdLst)
 
 
-class SlideMaster(_BaseSlide):
+class SlideMaster(_BaseMaster):
     """
-    Slide master object. Provides access to placeholders, regular shapes,
-    slide layouts, and slide master-level properties.
+    Slide master object. Provides access to slide layouts. Access to
+    placeholders, regular shapes, and slide master-level properties is
+    inherited from |_BaseMaster|.
     """
 
-    __slots__ = ('_placeholders', '_shapes', '_slide_layouts')
-
-    @lazyproperty
-    def placeholders(self):
-        """
-        Instance of |MasterPlaceholders| containing sequence of placeholder
-        shapes in this slide master, sorted in *idx* order.
-        """
-        return MasterPlaceholders(self._element.spTree, self)
-
-    @lazyproperty
-    def shapes(self):
-        """
-        Instance of |MasterShapes| containing sequence of shape objects
-        appearing on this slide.
-        """
-        return MasterShapes(self._element.spTree, self)
+    __slots__ = ('_slide_layouts',)
 
     @lazyproperty
     def slide_layouts(self):

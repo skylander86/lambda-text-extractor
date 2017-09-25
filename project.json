@@ -1,7 +1,12 @@
 {
-    "name": "text-extractor",
-    "description": "Extract text from binary documents.",
-    "runtime": "python",
-    "profile": "default",
-    "role": "arn:aws:iam::394252546268:role/lambda_basic_execution"
+    "name": "textractor-development",
+    "description": "[development] Extract text from binary documents.",
+    "runtime": "python3.6",
+    "defaultEnvironment": "development",
+    "environment": {
+        "ENVIRONMENT_NAME": "development",
+        "LOG_LEVEL": "DEBUG",
+        "TEXTRACTOR_OCR": "textractor-development_ocr",
+        "TEXTRACTOR_SIMPLE": "textractor-development_simple"
+    }
 }

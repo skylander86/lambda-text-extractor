@@ -17,8 +17,8 @@
 # See the README file for information on usage and redistribution.
 #
 
-from PIL import Image
-from PIL._util import isStringType
+from . import Image
+from ._util import isStringType
 import operator
 import functools
 
@@ -39,7 +39,7 @@ def _border(border):
 
 def _color(color, mode):
     if isStringType(color):
-        from PIL import ImageColor
+        from . import ImageColor
         color = ImageColor.getcolor(color, mode)
     return color
 
@@ -178,6 +178,27 @@ def crop(image, border=0):
         )
 
 
+def scale(image, factor, resample=Image.NEAREST):
+    """
+    Returns a rescaled image by a specific factor given in parameter.
+    A factor greater than 1 expands the image, between 0 and 1 contracts the
+    image.
+
+    :param factor: The expansion factor, as a float.
+    :param resample: An optional resampling filter. Same values possible as
+       in the PIL.Image.resize function.
+    :returns: An :py:class:`~PIL.Image.Image` object.
+    """
+    if factor == 1:
+        return image.copy()
+    elif factor <= 0:
+        raise ValueError("the factor must be greater than 0")
+    else:
+        size = (int(round(factor * image.width)),
+                int(round(factor * image.height)))
+        return image.resize(size, resample)
+
+
 def deform(image, deformer, resample=Image.BILINEAR):
     """
     Deform the image.
@@ -185,7 +206,8 @@ def deform(image, deformer, resample=Image.BILINEAR):
     :param image: The image to deform.
     :param deformer: A deformer object.  Any object that implements a
                     **getmesh** method can be used.
-    :param resample: What resampling filter to use.
+    :param resample: An optional resampling filter. Same values possible as
+       in the PIL.Image.transform function.
     :return: An image.
     """
     return image.transform(

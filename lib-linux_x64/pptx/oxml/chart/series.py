@@ -6,11 +6,30 @@ Series-related oxml objects.
 
 from __future__ import absolute_import, print_function, unicode_literals
 
+from .datalabel import CT_DLbls
 from ..simpletypes import XsdUnsignedInt
 from ..xmlchemy import (
     BaseOxmlElement, OneAndOnlyOne, OxmlElement, RequiredAttribute,
     ZeroOrMore, ZeroOrOne
 )
+
+
+class CT_AxDataSource(BaseOxmlElement):
+    """
+    ``<c:cat>`` custom element class used in category charts to specify
+    category labels and hierarchy.
+    """
+    multiLvlStrRef = ZeroOrOne('c:multiLvlStrRef', successors=())
+
+    @property
+    def lvls(self):
+        """
+        Return a list containing the `c:lvl` descendent elements in document
+        order. These will only be present when the required single child
+        is a `c:multiLvlStrRef` element. Returns an empty list when no
+        `c:lvl` descendent elements are present.
+        """
+        return self.xpath('.//c:lvl')
 
 
 class CT_DPt(BaseOxmlElement):
@@ -36,6 +55,14 @@ class CT_DPt(BaseOxmlElement):
         dPt = OxmlElement('c:dPt')
         dPt.append(OxmlElement('c:idx'))
         return dPt
+
+
+class CT_Lvl(BaseOxmlElement):
+    """
+    ``<c:lvl>`` custom element class used in multi-level categories to
+    specify a level of hierarchy.
+    """
+    pt = ZeroOrMore('c:pt', successors=())
 
 
 class CT_NumDataSource(BaseOxmlElement):
@@ -171,6 +198,10 @@ class CT_SeriesComposite(BaseOxmlElement):
         if not vals:
             return 0
         return int(vals[0])
+
+    def _new_dLbls(self):
+        """Override metaclass method that creates `c:dLbls` element."""
+        return CT_DLbls.new_dLbls()
 
     def _new_dPt(self):
         """

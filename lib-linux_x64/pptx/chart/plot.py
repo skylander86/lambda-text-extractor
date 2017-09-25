@@ -8,6 +8,7 @@ layered over a bar plot.
 
 from __future__ import absolute_import, print_function, unicode_literals
 
+from .category import Categories
 from .datalabel import DataLabels
 from ..enum.chart import XL_CHART_TYPE as XL
 from ..oxml.ns import qn
@@ -27,15 +28,19 @@ class _BasePlot(object):
         self._element = xChart
         self._chart = chart
 
-    @property
+    @lazyproperty
     def categories(self):
         """
-        A tuple containing the category strings for this plot, in the order
-        they appear on the category axis.
+        Returns a |category.Categories| sequence object containing
+        a |category.Category| object for each of the category labels
+        associated with this plot. The |category.Category| class derives from
+        ``str``, so the returned value can be treated as a simple sequence of
+        strings for the common case where all you need is the labels in the
+        order they appear on the chart. |category.Categories| provides
+        additional properties for dealing with hierarchical categories when
+        required.
         """
-        xChart = self._element
-        category_pt_elms = xChart.cat_pts
-        return tuple(pt.v.text for pt in category_pt_elms)
+        return Categories(self._element)
 
     @property
     def chart(self):
@@ -79,7 +84,8 @@ class _BasePlot(object):
             self._element._remove_dLbls()
         else:
             if self._element.dLbls is None:
-                self._element._add_dLbls()
+                dLbls = self._element._add_dLbls()
+                dLbls.showVal.val = True
 
     @lazyproperty
     def series(self):

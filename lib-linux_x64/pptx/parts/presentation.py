@@ -10,7 +10,7 @@ from ..opc.constants import RELATIONSHIP_TYPE as RT
 from ..opc.package import XmlPart
 from ..opc.packuri import PackURI
 from ..presentation import Presentation
-from .slide import SlidePart
+from .slide import NotesMasterPart, SlidePart
 from ..util import lazyproperty
 
 
@@ -47,6 +47,31 @@ class PresentationPart(XmlPart):
             if sldId.id == slide_id:
                 return self.related_parts[sldId.rId].slide
         return None
+
+    @lazyproperty
+    def notes_master(self):
+        """
+        Return the |NotesMaster| object for this presentation. If the
+        presentation does not have a notes master, one is created from
+        a default template. The same single instance is returned on each
+        call.
+        """
+        return self.notes_master_part.notes_master
+
+    @lazyproperty
+    def notes_master_part(self):
+        """
+        Return the |NotesMasterPart| object for this presentation. If the
+        presentation does not have a notes master, one is created from
+        a default template. The same single instance is returned on each
+        call.
+        """
+        try:
+            return self.part_related_by(RT.NOTES_MASTER)
+        except KeyError:
+            notes_master_part = NotesMasterPart.create_default(self.package)
+            self.relate_to(notes_master_part, RT.NOTES_MASTER)
+            return notes_master_part
 
     @lazyproperty
     def presentation(self):

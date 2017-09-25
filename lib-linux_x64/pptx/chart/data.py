@@ -6,7 +6,9 @@ ChartData and related objects.
 
 from __future__ import absolute_import, print_function, unicode_literals
 
+import datetime
 from collections import Sequence
+from numbers import Number
 
 from ..util import lazyproperty
 from .xlsx import (
@@ -253,19 +255,29 @@ class _BaseDataPoint(object):
 
 class CategoryChartData(_BaseChartData):
     """
-    A ChartData object suitable for use with category charts, all those
-    having a discrete set of string values (categories) as the range of their
-    independent axis (X-axis) values. Unlike the continuous ChartData types
-    such as XyChartData, CategoryChartData has a single category sequence in
-    lieu of X values for each data point and its data points have only the
-    Y value.
+    Accumulates data specifying the categories and series values for a chart
+    and acts as a proxy for the chart data table that will be written to an
+    Excel worksheet. Used as a parameter in :meth:`shapes.add_chart` and
+    :meth:`Chart.replace_data`.
+
+    This object is suitable for use with category charts, i.e. all those
+    having a discrete set of label values (categories) as the range of their
+    independent variable (X-axis) values. Unlike the ChartData types for
+    charts supporting a continuous range of independent variable values (such
+    as XyChartData), CategoryChartData has a single collection of category
+    (X) values and each data point in its series specifies only the Y value.
+    The corresponding X value is inferred by its position in the sequence.
     """
-    def add_category(self, name):
+    def add_category(self, label):
         """
-        Return a newly created |Category| object having *name* and appended
-        to the end of the category sequence for this chart.
+        Return a newly created |data.Category| object having *label* and
+        appended to the end of the category collection for this chart.
+        *label* can be a string, a number, a datetime.date, or
+        datetime.datetime object. All category labels in a chart must be the
+        same type. All category labels in a chart having multi-level
+        categories must be strings.
         """
-        return self.categories.add_category(name)
+        return self.categories.add_category(label)
 
     def add_series(self, name, values=(), number_format=None):
         """
@@ -286,18 +298,22 @@ class CategoryChartData(_BaseChartData):
     @lazyproperty
     def categories(self):
         """
-        A |Categories| object providing access to the hierarchy of category
-        objects for this chart data. Assigning an iterable of category names
-        (strings) replaces the |Categories| object with a new one containing
-        a category for each name.
+        A |data.Categories| object providing access to the hierarchy of
+        category objects for this chart data. Assigning an iterable of
+        category labels (strings, numbers, or dates) replaces the
+        |data.Categories| object with a new one containing a category for
+        each label in the sequence.
+
+        Creating a chart from chart data having date categories will cause
+        the chart to have a |DateAxis| for its category axis.
         """
         return Categories()
 
     @categories.setter
-    def categories(self, category_names):
+    def categories(self, category_labels):
         categories = Categories()
-        for name in category_names:
-            categories.add_category(name)
+        for label in category_labels:
+            categories.add_category(label)
         self._categories = categories
 
     @property
@@ -326,12 +342,13 @@ class CategoryChartData(_BaseChartData):
 
 class Categories(Sequence):
     """
-    A sequence of |Category| objects, also having certain hierarchical graph
-    behaviors for support of multi-level (nested) categories.
+    A sequence of |data.Category| objects, also having certain hierarchical
+    graph behaviors for support of multi-level (nested) categories.
     """
     def __init__(self):
         super(Categories, self).__init__()
         self._categories = []
+        self._number_format = None
 
     def __getitem__(self, idx):
         return self._categories.__getitem__(idx)
@@ -345,14 +362,61 @@ class Categories(Sequence):
         """
         return self._categories.__len__()
 
-    def add_category(self, name):
+    def add_category(self, label):
         """
-        Return a newly created |Category| object having *name* and appended
-        to the end of this category sequence.
+        Return a newly created |data.Category| object having *label* and
+        appended to the end of this category sequence. *label* can be
+        a string, a number, a datetime.date, or datetime.datetime object. All
+        category labels in a chart must be the same type. All category labels
+        in a chart having multi-level categories must be strings.
+
+        Creating a chart from chart data having date categories will cause
+        the chart to have a |DateAxis| for its category axis.
         """
-        category = Category(name, self)
+        category = Category(label, self)
         self._categories.append(category)
         return category
+
+    @property
+    def are_dates(self):
+        """
+        Return |True| if the first category in this collection has a date
+        label (as opposed to str or numeric). A date label is one of type
+        datetime.date or datetime.datetime. Returns |False| otherwise,
+        including when this category collection is empty. It also returns
+        False when this category collection is hierarchical, because
+        hierarchical categories can only be written as string labels.
+        """
+        if self.depth != 1:
+            return False
+        first_cat_label = self[0].label
+        date_types = (datetime.date, datetime.datetime)
+        if isinstance(first_cat_label, date_types):
+            return True
+        return False
+
+    @property
+    def are_numeric(self):
+        """
+        Return |True| if the first category in this collection has a numeric
+        label (as opposed to a string label), including if that value is
+        a datetime.date or datetime.datetime object (as those are converted
+        to integers for storage in Excel). Returns |False| otherwise,
+        including when this category collection is empty. It also returns
+        False when this category collection is hierarchical, because
+        hierarchical categories can only be written as string labels.
+        """
+        if self.depth != 1:
+            return False
+        # This method only tests the first category. The categories must
+        # be of uniform type, and if they're not, there will be problems
+        # later in the process, but it's not this method's job to validate
+        # the caller's input.
+        first_cat_label = self[0].label
+        numeric_types = (Number, datetime.date, datetime.datetime)
+        if isinstance(first_cat_label, numeric_types):
+            return True
+        return False
 
     @property
     def depth(self):
@@ -393,7 +457,7 @@ class Categories(Sequence):
     @property
     def levels(self):
         """
-        A generator of (idx, name) sequences representing the category
+        A generator of (idx, label) sequences representing the category
         hierarchy from the bottom up. The first level contains all leaf
         categories, and each subsequent is the next level up.
         """
@@ -406,30 +470,61 @@ class Categories(Sequence):
                 for level in levels(sub_categories):
                     yield level
             # yield this level
-            yield [(cat.idx, cat.name) for cat in categories]
+            yield [(cat.idx, cat.label) for cat in categories]
 
         for level in levels(self):
             yield level
 
+    @property
+    def number_format(self):
+        """
+        Read/write. Return a string representing the number format used in
+        Excel to format these category values, e.g. '0.0' or 'mm/dd/yyyy'.
+        This string is only relevant when the categories are numeric or date
+        type, although it returns 'General' without error when the categories
+        are string labels. Assigning |None| causes the default number format
+        to be used, based on the type of the category labels.
+        """
+        GENERAL = 'General'
+
+        # defined value takes precedence
+        if self._number_format is not None:
+            return self._number_format
+
+        # multi-level (should) always be string labels
+        # zero depth means empty in which case we can't tell anyway
+        if self.depth != 1:
+            return GENERAL
+
+        # everything except dates gets 'General'
+        first_cat_label = self[0].label
+        if isinstance(first_cat_label, (datetime.date, datetime.datetime)):
+            return 'yyyy\-mm\-dd'
+        return GENERAL
+
+    @number_format.setter
+    def number_format(self, value):
+        self._number_format = value
+
 
 class Category(object):
     """
-    A chart category, primarily having a name to be displayed in the category
-    axis, but also able to be configured in a hierarchy for support of
-    multi-level category charts.
+    A chart category, primarily having a label to be displayed on the
+    category axis, but also able to be configured in a hierarchy for support
+    of multi-level category charts.
     """
-    def __init__(self, name, parent):
+    def __init__(self, label, parent):
         super(Category, self).__init__()
-        self._name = name
+        self._label = label
         self._parent = parent
         self._sub_categories = []
 
-    def add_sub_category(self, name):
+    def add_sub_category(self, label):
         """
-        Return a newly created |Category| object having *name* and appended
-        to the end of the sub-category sequence for this category.
+        Return a newly created |data.Category| object having *label* and
+        appended to the end of the sub-category sequence for this category.
         """
-        category = Category(name, self)
+        category = Category(label, self)
         self._sub_categories.append(category)
         return category
 
@@ -480,11 +575,25 @@ class Category(object):
         return sum(category.leaf_count for category in self._sub_categories)
 
     @property
-    def name(self):
+    def label(self):
         """
-        The string that appears on the axis for this category.
+        The value that appears on the axis for this category. The label can
+        be a string, a number, or a datetime.date or datetime.datetime
+        object.
         """
-        return self._name
+        return self._label
+
+    def numeric_str_val(self, date_1904=False):
+        """
+        The string representation of the numeric (or date) label of this
+        category, suitable for use in the XML `c:pt` element for this
+        category. The optional *date_1904* parameter specifies the epoch used
+        for calculating Excel date numbers.
+        """
+        label = self._label
+        if isinstance(label, (datetime.date, datetime.datetime)):
+            return '%.1f' % self._excel_date_number(date_1904)
+        return str(self._label)
 
     @property
     def sub_categories(self):
@@ -493,13 +602,32 @@ class Category(object):
         """
         return self._sub_categories
 
+    def _excel_date_number(self, date_1904):
+        """
+        Return an integer representing the date label of this category as the
+        number of days since January 1, 1900 (or 1904 if date_1904 is
+        |True|).
+        """
+        date, label = datetime.date, self._label
+        # -- get date from label in type-independent-ish way
+        date_ = date(label.year, label.month, label.day)
+        epoch = date(1904, 1, 1) if date_1904 else date(1899, 12, 31)
+        delta = date_ - epoch
+        excel_day_number = delta.days
+
+        # -- adjust for Excel mistaking 1900 for a leap year --
+        if not date_1904 and excel_day_number > 59:
+            excel_day_number += 1
+
+        return excel_day_number
+
 
 class ChartData(CategoryChartData):
     """
-    Accumulates data specifying the categories and series values for a plot
-    and acts as a proxy for the chart data table that will be written to an
-    Excel worksheet. Used as a parameter in :meth:`shapes.add_chart` and
-    :meth:`Chart.replace_data`.
+    |ChartData| is simply an alias for |CategoryChartData| and may be removed
+    in a future release. All new development should use |CategoryChartData|
+    for creating or replacing the data in chart types other than XY and
+    Bubble.
     """
 
 
@@ -522,8 +650,8 @@ class CategorySeriesData(_BaseSeriesData):
     @property
     def categories(self):
         """
-        The |Categories| object that provides access to the category objects
-        for this series.
+        The |data.Categories| object that provides access to the category
+        objects for this series.
         """
         return self._chart_data.categories
 

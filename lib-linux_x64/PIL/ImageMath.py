@@ -15,8 +15,7 @@
 # See the README file for information on usage and redistribution.
 #
 
-from PIL import Image
-from PIL import _imagingmath
+from . import Image, _imagingmath
 
 try:
     import builtins
@@ -32,7 +31,7 @@ def _isconstant(v):
 
 
 class _Operand(object):
-    # wraps an image operand, providing standard operators
+    """Wraps an image operand, providing standard operators"""
 
     def __init__(self, im):
         self.im = im

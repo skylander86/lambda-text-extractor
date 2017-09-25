@@ -19,7 +19,7 @@ cdef extern from "etree_defs.h":
                                           int start_node_inclusive) nogil
     cdef void END_FOR_EACH_ELEMENT_FROM(tree.xmlNode* start_node) nogil
 
-cdef extern from "lxml.etree_api.h":
+cdef extern from "etree_api.h":
 
     # first function to call!
     cdef int import_lxml__etree() except -1
@@ -60,6 +60,9 @@ cdef extern from "lxml.etree_api.h":
 
     # create an ElementTree subclass for an Element
     cdef _ElementTree newElementTree(_Element context_node, object subclass)
+
+    # create an ElementTree from an external document
+    cdef _ElementTree adoptExternalDocument(tree.xmlDoc* c_doc, parser, bint is_owned)
 
     # create a new Element for an existing or new document (doc = None)
     # builds Python object after setting text, tail, namespaces and attributes

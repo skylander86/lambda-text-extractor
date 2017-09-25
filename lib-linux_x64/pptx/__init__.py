@@ -1,10 +1,8 @@
 # encoding: utf-8
 
-"""
-Initialization module for python-pptx
-"""
+"""Initialization module for python-pptx package."""
 
-__version__ = '0.6.1'
+__version__ = '0.6.6'
 
 
 import pptx.exc as exceptions
@@ -19,8 +17,12 @@ from pptx.opc.package import PartFactory
 from pptx.parts.chart import ChartPart
 from pptx.parts.coreprops import CorePropertiesPart
 from pptx.parts.image import ImagePart
+from pptx.parts.media import MediaPart
 from pptx.parts.presentation import PresentationPart
-from pptx.parts.slide import SlideLayoutPart, SlideMasterPart, SlidePart
+from pptx.parts.slide import (
+    NotesMasterPart, NotesSlidePart, SlideLayoutPart, SlideMasterPart,
+    SlidePart
+)
 
 content_type_to_part_class_map = {
     CT.PML_PRESENTATION_MAIN: PresentationPart,
@@ -28,6 +30,8 @@ content_type_to_part_class_map = {
     CT.PML_TEMPLATE_MAIN:     PresentationPart,
     CT.PML_SLIDESHOW_MAIN:    PresentationPart,
     CT.OPC_CORE_PROPERTIES:   CorePropertiesPart,
+    CT.PML_NOTES_MASTER:      NotesMasterPart,
+    CT.PML_NOTES_SLIDE:       NotesSlidePart,
     CT.PML_SLIDE:             SlidePart,
     CT.PML_SLIDE_LAYOUT:      SlideLayoutPart,
     CT.PML_SLIDE_MASTER:      SlideMasterPart,
@@ -40,11 +44,21 @@ content_type_to_part_class_map = {
     CT.TIFF:                  ImagePart,
     CT.X_EMF:                 ImagePart,
     CT.X_WMF:                 ImagePart,
+    CT.ASF:                   MediaPart,
+    CT.AVI:                   MediaPart,
+    CT.MOV:                   MediaPart,
+    CT.MP4:                   MediaPart,
+    CT.MPG:                   MediaPart,
+    CT.MS_VIDEO:              MediaPart,
+    CT.SWF:                   MediaPart,
+    CT.VIDEO:                 MediaPart,
+    CT.WMV:                   MediaPart,
+    CT.X_MS_VIDEO:            MediaPart,
 }
 
 PartFactory.part_type_for.update(content_type_to_part_class_map)
 
 del (
-    ChartPart, CorePropertiesPart, ImagePart, SlidePart, SlideLayoutPart,
-    SlideMasterPart, PresentationPart, CT, PartFactory
+    ChartPart, CorePropertiesPart, ImagePart, MediaPart, SlidePart,
+    SlideLayoutPart, SlideMasterPart, PresentationPart, CT, PartFactory
 )
