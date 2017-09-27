@@ -33,16 +33,16 @@ Some of its key features are:
 
 ## Setup
 
-Due to the size of code and dependencies (and AWS deployment limits), the extraction system is split into two Lambda functions: `simple` and `ocr`.
+Due to the size of code and dependencies (and AWS Lambda's 50MB package limits), the extraction system is split into two Lambda functions: `simple` and `ocr`.
 [`ocr`](functions/ocr) supports extracting text from images and "image" PDFs, while [`simple`](functions/simple) handles text extraction from the remaining formats.
 The side benefit of splitting into two functions is that we can configure the memory requirements of the two functions independently.
 
-The code for the two functions are found in the [functions](functions) directory and we use [apex](http://apex.run/) for our development toolchain to deploy the AWS Lambda functions.
+We use [apex](http://apex.run/) for our development toolchain to deploy the AWS Lambda functions; the code for the two Lambda functions are found in the [functions](functions) directory.
 To deploy to AWS (*Note* that the `-D` argument refers to dry run mode.)
 
     apex -D deploy
 
-You need to make sure your IAM role has `lambda:InvokeAsync` permissions, and `s3:PutObject` permissions on the output bucket.
+You need to ensure your IAM role has `lambda:InvokeAsync` permissions, and `s3:PutObject` permissions on the output bucket.
 Generally, we would advice using a specific bucket with auto-delete lifecycle rules for the temporary storage.
 You can set the IAM role and other configuration options in [project.json](project.json).
 
@@ -51,7 +51,7 @@ For our needs, we find that 512MB for `simple` and 1024MB for `ocr` is a good ba
 
 ## Usage
 
-### `simple`
+### Non OCR Text Extraction
 
 The `simple` function expects an `event` with
 
@@ -66,9 +66,9 @@ The `simple` function expects an `event` with
 
     aws s3 cp s3://bucket/tracemonkey.txt -
 
-It automatically fallsback to `ocr` function when it necesay
+It automatically fallbacks to `ocr` function when it necesay
 
-### `ocr`
+### OCR Text Extraction
 
 The `ocr` expects the same `event` as `simple` with the following additional fields:
 
@@ -83,7 +83,7 @@ As there are multiple steps in OCR PDF extraction, there are several additional 
 - `RETURN_RESULTS_DURATION`: The number of seconds to reserve at the end for compiling results and returning them. Defaults to 3 seconds.
 - `TEXTRACT_OUTPUT_WAIT_BUFFER_TIME`: The number of seconds to reserve for the overhead in async wait of each page's OCR Lambda functions to return. Defaults to 5 seconds.
 
-For more details about how PDF OCR extraction work here, see section on [PDF OCR Extraction](#PDF-OCR-Extraction).
+For more details about how PDF OCR extraction work here, see section on [PDF OCR Extraction](#pdf-ocr-extraction).
 
 #### Example
 
