@@ -1,35 +1,49 @@
 # Extracting Text from Binary Document Formats
 
-`text-extractor` is a Python app that works with the AWS Lambda architecture to extract text from common binary document formats.
-It is integrated into the Intelllex ML pipeline architecture.
+`lambda-text-extractor` is a Python 3.6 app that works with the AWS Lambda architecture to extract text from common binary document formats.
 
-Due to the size of code and dependencies (and AWS deployment limits), it is split into two functions.
+## Features
 
-[`ocr`](functions/ocr) supports extracting text from images (TIFF, JPEG, PNG) and "image" PDF (using [Ghostscript](https://ghostscript.com/download/gsdnld.html) 9.21 for PDF manipulation and [Tesseract](https://github.com/tesseract-ocr/tesseract/) 3.05 for OCR)
+Some of its key features are:
 
-while [`simple`](functions/simple/) handles text extraction from
+- out of the box support for many common binary document formats (see section on [Supported Formats](#Supported-Formats)),
+- scalable PDF parsing using OCR in parallel using AWS Lambda and [asyncio](https://docs.python.org/3/library/asyncio.html),
+- serverless architecture makes deployment quick and easy,
+- detailed instruction for preparing libraries and dependencies necessary for processing binary documents, and
+- sensible unicode handling
 
-- Modern PDF file with text layer
-- Microsoft Word 2, 6, 7, 97, 2000, 2002 and 2003 (using [Antiword](http://www.winfield.demon.nl/) and [Catdoc](http://www.wagner.pp.ru/~vitus/software/catdoc/)),
-- Microsoft Word 2007 OpenXML files (using [python-docx](https://github.com/python-openxml/python-docx)),
-- Microsoft PowerPoint 2007 OpenXML files (using [python-pptx](https://github.com/scanny/python-pptx)),
-- Microsoft Excel 5.0, 97-2003, and 2007 OpenXML files (using [xlrd](http://xlrd.readthedocs.io/en/latest/)),
-- HTML web pages (using [lxml](http://lxml.de/)),
-- Rich Text Format (using [UnRTF](https://www.gnu.org/software/unrtf/) v0.21.9),
-- CSV and Text files (Python CSV and duh)
+### Supported Formats
 
-## Deploying on AWS Lambda
+`lambda-text-extractor` supports many common and legacy document formats:
 
-We use [apex](http://apex.run/) for our development toolchain to manage AWS lambda functions.
+- Portable Document Format (`.pdf`),
+    * PDFs with a text layer using [Poppler utilities](https://poppler.freedesktop.org/),
+    * PDFs with OCR using [Tesseract](https://github.com/tesseract-ocr/tesseract/) and [Ghostscript 9.21](https://ghostscript.com/download/gsdnld.html) for PDF manipulation,
+- Microsoft Word 2, 6, 7, 97, 2000, 2002 and 2003 (`.doc`) using [Antiword](http://www.winfield.demon.nl/) with fallback to [Catdoc](http://www.wagner.pp.ru/~vitus/software/catdoc/),
+- Microsoft Word 2007 OpenXML files (`.docx`) using [python-docx](https://github.com/python-openxml/python-docx),
+- Microsoft PowerPoint 2007 OpenXML files (`.pptx`) using [python-pptx](https://github.com/scanny/python-pptx),
+- Microsoft Excel 5.0, 97-2003, and 2007 OpenXML files (`.xls`, `.xlsx`) using [xlrd](http://xlrd.readthedocs.io/en/latest/),
+- Rich Text Format (`.rtf`) using [UnRTF v0.21.9](https://www.gnu.org/software/unrtf/),
+- XML files and HTML web pages (`.html`, `.htm`, `.xml`) using [lxml](http://lxml.de/),
+- CSV files (`.csv`) using [Python csv module](https://docs.python.org/3/library/csv.html),
+- Images (`.tiff`, `.jpg`, `.jpeg`, `.png`) using [Tesseract](https://github.com/tesseract-ocr/tesseract/), and
+- Plain text files (`.txt`)
 
-To deploy to development environment (*Note* that the `-D` argument refers to dry run mode.)
+## Setup
 
-    apex -D deploy
+Due to the size of code and dependencies (and AWS deployment limits), the extraction system is split into two Lambda functions: `simple` and `ocr`.
+[`ocr`](functions/ocr) supports extracting text from images and "image" PDFs, while [`simple`](functions/simple) handles text extraction from the remaining formats.
+The side benefit of splitting into two functions is that we can configure the memory requirements of the two functions independently.
 
-For `staging` and `production` environments, we have set up a CI script on Gitlab.
-Simply push to the `staging` and `production` branches respectively.
+The code for the two functions are found in the [functions](functions) directory and we use [apex](http://apex.run/) for our development toolchain to deploy the AWS Lambda functions.
+To deploy to AWS (*Note* that the `-D` argument refers to dry run mode.)
+
+    apex -D --iamrole <iam role here> deploy
 
 You need to make sure your IAM role has `lambda:InvokeFunction` permissions, and `s3:DeleteObject` permissions on the output bucket.
+You can set the IAM role and other configuration options in [project.json](project.json).
+
+## Usage
 
 ### Invoking the AWS Lambda
 
@@ -62,35 +76,6 @@ When all pages have been processed or when there is less than 5 seconds remainin
 Occasionally, low resolution / complicated images will take > 300 seconds to complete and these missing pages will be logged as a warning to the default logger.
 
 If anybody knows of a better pattern for processing PDFs, do feel free to submit a pull request.
-
-### Tests
-
-We set up 8-hourly cron jobs that routinely tests the `staging` and `production` Lambda functions for any issues.
-
-Creating the Cloudwatch events
-
-    aws events put-rule --cli-input-json file://./tests.cloudwatch_events_rule.json
-    aws events put-targets --cli-input-json file://./tests.cloudwatch_rule_targets.json
-
-A full test takes about 120 seconds to complete.
-
-We need to give Cloudwatch permissions to invoke the Lambda functions
-
-    aws lambda add-permission \
-        --statement-id 'cloudwatch-staging-textractor-tests-cron' \
-        --action 'lambda:InvokeFunction' \
-        --principal events.amazonaws.com \
-        --source-arn 'arn:aws:events:ap-southeast-1:995281781671:rule/textractor-tests-cron' \
-        --function-name intelllex-textractor-staging_tests \
-        --region ap-southeast-1
-
-    aws lambda add-permission \
-        --statement-id 'cloudwatch-production-textractor-tests-cron' \
-        --action 'lambda:InvokeFunction' \
-        --principal events.amazonaws.com \
-        --source-arn 'arn:aws:events:ap-southeast-1:995281781671:rule/textractor-tests-cron' \
-        --function-name intelllex-textractor-production_tests \
-        --region ap-southeast-1
 
 ## Building executables and modules for the AWS Lambda execution environment
 

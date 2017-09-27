@@ -1,12 +1,12 @@
 {
-    "name": "textractor-development",
-    "description": "[development] Extract text from binary documents.",
+    "name": "textractor",
+    "description": "Extract text from binary documents.",
     "runtime": "python3.6",
+    "role": "",
     "defaultEnvironment": "development",
     "environment": {
-        "ENVIRONMENT_NAME": "development",
-        "LOG_LEVEL": "DEBUG",
-        "TEXTRACTOR_OCR": "textractor-development_ocr",
-        "TEXTRACTOR_SIMPLE": "textractor-development_simple"
+        "LOG_LEVEL": "INFO",
+        "TEXTRACTOR_OCR": "textractor-ocr",
+        "TEXTRACTOR_SIMPLE": "textractor-simple"
     }
 }

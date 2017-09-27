@@ -1,3 +1,4 @@
+aiobotocore
 boto3
 requests
 
@@ -9,3 +10,4 @@ lxml
 odfpy
 
 uriutils
+
