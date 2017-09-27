@@ -1,4 +1,4 @@
-# Extracting Text from Binary Document Formats
+# Extracting Text from Binary Document Formats using AWS Lambda
 
 `lambda-text-extractor` is a Python 3.6 app that works with the AWS Lambda architecture to extract text from common binary document formats.
 
