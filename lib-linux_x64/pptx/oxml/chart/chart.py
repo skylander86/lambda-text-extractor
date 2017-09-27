@@ -8,6 +8,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 from .. import parse_xml
 from ..ns import nsdecls, qn
+from .shared import CT_Title
 from ..simpletypes import ST_Style, XsdString
 from ..xmlchemy import (
     BaseOxmlElement, OneAndOnlyOne, RequiredAttribute, ZeroOrMore, ZeroOrOne
@@ -15,13 +16,15 @@ from ..xmlchemy import (
 
 
 class CT_Chart(BaseOxmlElement):
-    """
-    ``<c:chart>`` custom element class
-    """
+    """`c:chart` custom element class."""
+    _tag_seq = (
+        'c:title', 'c:autoTitleDeleted', 'c:pivotFmts', 'c:view3D',
+        'c:floor', 'c:sideWall', 'c:backWall', 'c:plotArea', 'c:legend',
+        'c:plotVisOnly', 'c:dispBlanksAs', 'c:showDLblsOverMax', 'c:extLst',
+    )
+    title = ZeroOrOne('c:title', successors=_tag_seq[1:])
     plotArea = OneAndOnlyOne('c:plotArea')
-    legend = ZeroOrOne('c:legend', successors=(
-        'c:plotVisOnly', 'c:dispBlanksAs', 'c:showDLblsOverMax', 'c:extLst'
-    ))
+    legend = ZeroOrOne('c:legend', successors=_tag_seq[9:])
     rId = RequiredAttribute('r:id', XsdString)
 
     _chart_tmpl = (
@@ -61,52 +64,54 @@ class CT_Chart(BaseOxmlElement):
         chart = parse_xml(xml)
         return chart
 
+    def _new_title(self):
+        return CT_Title.new_title()
+
 
 class CT_ChartSpace(BaseOxmlElement):
-    """
-    ``<c:chartSpace>`` element class, the root element of a chart part.
-    """
-    style = ZeroOrOne('c:style', successors=(
-        'c:clrMapOvr', 'c:pivotSource', 'c:protection', 'c:chart'
-    ))
+    """`c:chartSpace` element class, the root element of a chart part."""
+    _tag_seq = (
+        'c:date1904', 'c:lang', 'c:roundedCorners', 'c:style', 'c:clrMapOvr',
+        'c:pivotSource', 'c:protection', 'c:chart', 'c:spPr', 'c:txPr',
+        'c:externalData', 'c:printSettings', 'c:userShapes', 'c:extLst',
+    )
+    date1904 = ZeroOrOne('c:date1904', successors=_tag_seq[1:])
+    style = ZeroOrOne('c:style', successors=_tag_seq[4:])
     chart = OneAndOnlyOne('c:chart')
-    externalData = ZeroOrOne('c:externalData', successors=(
-        'c:printSettings', 'c:userShapes', 'c:extLst'
-    ))
+    externalData = ZeroOrOne('c:externalData', successors=_tag_seq[11:])
+    del _tag_seq
 
     @property
     def catAx_lst(self):
         return self.chart.plotArea.catAx_lst
 
     @property
-    def last_doc_order_ser(self):
+    def date_1904(self):
         """
-        Return the last `<c:ser>` element in the last xChart element, based
-        on document order. Note this is not necessarily the same element as
-        ``self.sers[-1]``.
+        Return |True| if the `c:date1904` child element resolves truthy,
+        |False| otherwise. This value indicates whether date number values
+        are based on the 1900 or 1904 epoch.
         """
-        last_xChart = list(self.chart.plotArea.iter_plots())[-1]
-        sers = list(last_xChart.iter_sers())
-        if not sers:
-            return None
-        return sers[-1]
+        date1904 = self.date1904
+        if date1904 is None:
+            return False
+        return date1904.val
 
     @property
-    def sers(self):
-        """
-        An immutable sequence of the `c:ser` elements under this chartSpace
-        element, sorted in order of their `c:ser/c:idx/@val` value and with
-        any gaps in numbering collapsed.
-        """
-        def ser_idx(ser):
-            return ser.idx.val
+    def dateAx_lst(self):
+        return self.xpath('c:chart/c:plotArea/c:dateAx')
 
-        sers = sorted(self.xpath('.//c:ser'), key=ser_idx)
-        for idx, ser in enumerate(sers):
-            if ser.idx.val != idx:
-                ser.idx.val = idx
-                ser.order.val = idx
-        return sers
+    def get_or_add_title(self):
+        """Return the `c:title` grandchild, newly created if not present."""
+        return self.chart.get_or_add_title()
+
+    @property
+    def plotArea(self):
+        """
+        Return the required `c:chartSpace/c:chart/c:plotArea` grandchild
+        element.
+        """
+        return self.chart.plotArea
 
     @property
     def valAx_lst(self):
@@ -151,9 +156,19 @@ class CT_PlotArea(BaseOxmlElement):
     catAx = ZeroOrMore('c:catAx')
     valAx = ZeroOrMore('c:valAx')
 
-    def iter_plots(self):
+    def iter_sers(self):
         """
-        Generate each xChart child element in the order it appears.
+        Generate each of the `c:ser` elements in this chart, ordered first by
+        the document order of the containing xChart element, then by their
+        ordering within the xChart element (not necessarily document order).
+        """
+        for xChart in self.iter_xCharts():
+            for ser in xChart.iter_sers():
+                yield ser
+
+    def iter_xCharts(self):
+        """
+        Generate each xChart child element in document.
         """
         plot_tags = (
             qn('c:area3DChart'), qn('c:areaChart'), qn('c:bar3DChart'),
@@ -168,6 +183,60 @@ class CT_PlotArea(BaseOxmlElement):
             if child.tag not in plot_tags:
                 continue
             yield child
+
+    @property
+    def last_ser(self):
+        """
+        Return the last `<c:ser>` element in the last xChart element, based
+        on series order (not necessarily the same element as document order).
+        """
+        last_xChart = self.xCharts[-1]
+        sers = last_xChart.sers
+        if not sers:
+            return None
+        return sers[-1]
+
+    @property
+    def next_idx(self):
+        """
+        Return the next available `c:ser/c:idx` value within the scope of
+        this chart, the maximum idx value found on existing series,
+        incremented by one.
+        """
+        idx_vals = [s.idx.val for s in self.sers]
+        if not idx_vals:
+            return 0
+        return max(idx_vals)+1
+
+    @property
+    def next_order(self):
+        """
+        Return the next available `c:ser/c:order` value within the scope of
+        this chart, the maximum order value found on existing series,
+        incremented by one.
+        """
+        order_vals = [s.order.val for s in self.sers]
+        if not order_vals:
+            return 0
+        return max(order_vals)+1
+
+    @property
+    def sers(self):
+        """
+        Return a sequence containing all the `c:ser` elements in this chart,
+        ordered first by the document order of the containing xChart element,
+        then by their ordering within the xChart element (not necessarily
+        document order).
+        """
+        return tuple(self.iter_sers())
+
+    @property
+    def xCharts(self):
+        """
+        Return a sequence containing all the `c:{x}Chart` elements in this
+        chart, in document order.
+        """
+        return tuple(self.iter_xCharts())
 
 
 class CT_Style(BaseOxmlElement):

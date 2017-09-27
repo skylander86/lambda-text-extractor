@@ -41,18 +41,20 @@
 #endif
 
 #if PY_MAJOR_VERSION >= 3
-#  define IS_PYTHON3 1
+#  define IS_PYTHON2 0  /* prefer for special casing Python 2.x */
+#  define IS_PYTHON3 1  /* avoid */
 #else
+#  define IS_PYTHON2 1
 #  define IS_PYTHON3 0
 #endif
 
-#if IS_PYTHON3
-#undef LXML_UNICODE_STRINGS
-#define LXML_UNICODE_STRINGS 1
-#else
+#if IS_PYTHON2
 #ifndef LXML_UNICODE_STRINGS
 #define LXML_UNICODE_STRINGS 0
 #endif
+#else
+#undef LXML_UNICODE_STRINGS
+#define LXML_UNICODE_STRINGS 1
 #endif
 
 #if !IS_PYPY
@@ -71,8 +73,8 @@
 #  define PyFile_AsFile(o)                   (NULL)
 #  undef PyByteArray_Check
 #  define PyByteArray_Check(o)               (0)
-#elif IS_PYTHON3
-   /* Python 3 doesn't have PyFile_*() anymore */
+#elif !IS_PYTHON2
+   /* Python 3+ doesn't have PyFile_*() anymore */
 #  define PyFile_AsFile(o)                   (NULL)
 #endif
 
@@ -87,7 +89,7 @@
 #  ifndef PyUnicode_FromFormat
 #    define PyUnicode_FromFormat  PyString_FromFormat
 #  endif
-#  if IS_PYTHON3 && !defined(PyBytes_FromFormat)
+#  if !IS_PYTHON2 && !defined(PyBytes_FromFormat)
 #    ifdef PyString_FromFormat
 #      define PyBytes_FromFormat  PyString_FromFormat
 #    else
@@ -174,6 +176,9 @@ static PyObject* PyBytes_FromFormat(const char* format, ...) {
 #  define xmlSchematronSetValidStructuredErrors(ctxt, errorfunc, data)
 #endif
 
+#if LIBXML_VERSION < 20708
+#  define HTML_PARSE_NODEFDTD 4
+#endif
 #if LIBXML_VERSION < 20900
 #  define XML_PARSE_BIG_LINES 4194304
 #endif
@@ -192,6 +197,8 @@ static PyObject* PyBytes_FromFormat(const char* format, ...) {
 #define exsltMathXpathCtxtRegister(ctxt, prefix)
 #define exsltStrXpathCtxtRegister(ctxt, prefix)
 #endif
+
+#define LXML_GET_XSLT_ENCODING(result_var, style) XSLT_GET_IMPORT_PTR(result_var, style, encoding)
 
 /* work around MSDEV 6.0 */
 #if (_MSC_VER == 1200) && (WINVER < 0x0500)
@@ -254,6 +261,49 @@ long _ftol2( double dblSource ) { return _ftol( dblSource ); }
 #define _getNs(c_node) \
         (((c_node)->ns == 0) ? 0 : ((c_node)->ns->href))
 
+
+/* PyCapsule was added in Py2.7 */
+#if PY_VERSION_HEX >= 0x02070000
+#include "string.h"
+static void* lxml_unpack_xmldoc_capsule(PyObject* capsule, int* is_owned) {
+    xmlDoc *c_doc;
+    void *context;
+    *is_owned = 0;
+    if (unlikely_condition(!PyCapsule_IsValid(capsule, (const char*)"libxml2:xmlDoc"))) {
+        PyErr_SetString(
+                PyExc_TypeError,
+                "Not a valid capsule. The capsule argument must be a capsule object with name libxml2:xmlDoc");
+        return NULL;
+    }
+    c_doc = (xmlDoc*) PyCapsule_GetPointer(capsule, (const char*)"libxml2:xmlDoc");
+    if (unlikely_condition(!c_doc)) return NULL;
+
+    if (unlikely_condition(c_doc->type != XML_DOCUMENT_NODE && c_doc->type != XML_HTML_DOCUMENT_NODE)) {
+        PyErr_Format(
+            PyExc_ValueError,
+            "Illegal document provided: expected XML or HTML, found %d", (int)c_doc->type);
+        return NULL;
+    }
+
+    context = PyCapsule_GetContext(capsule);
+    if (unlikely_condition(!context && PyErr_Occurred())) return NULL;
+    if (context && strcmp((const char*) context, "destructor:xmlFreeDoc") == 0) {
+        /* take ownership by setting destructor to NULL */
+        if (PyCapsule_SetDestructor(capsule, NULL) == 0) {
+            /* ownership transferred => invalidate capsule by clearing its name */
+            if (unlikely_condition(PyCapsule_SetName(capsule, NULL))) {
+                /* this should never happen since everything above succeeded */
+                xmlFreeDoc(c_doc);
+                return NULL;
+            }
+            *is_owned = 1;
+        }
+    }
+    return c_doc;
+}
+#else
+#  define lxml_unpack_xmldoc_capsule(capsule, is_owned)  (((capsule) || (is_owned)) ? NULL : NULL)
+#endif
 
 /* Macro pair implementation of a depth first tree walker
  *

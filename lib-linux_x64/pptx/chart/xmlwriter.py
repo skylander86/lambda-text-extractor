@@ -9,6 +9,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 from copy import deepcopy
 from xml.sax.saxutils import escape
 
+from ..compat import to_unicode
 from ..enum.chart import XL_CHART_TYPE
 from ..oxml import parse_xml
 from ..oxml.ns import nsdecls
@@ -107,9 +108,10 @@ class _BaseSeriesXmlWriter(object):
     """
     Provides shared members for series XML writers.
     """
-    def __init__(self, series):
+    def __init__(self, series, date_1904=False):
         super(_BaseSeriesXmlWriter, self).__init__()
         self._series = series
+        self._date_1904 = date_1904
 
     @property
     def name(self):
@@ -229,62 +231,63 @@ class _BaseSeriesXmlRewriter(object):
         last plot in the chart and series formatting is "cloned" from the
         last series in that plot.
         """
+        plotArea, date_1904 = chartSpace.plotArea, chartSpace.date_1904
         chart_data = self._chart_data
-        sers = self._adjust_ser_count(chartSpace, len(chart_data))
-        for ser, series_data in zip(sers, chart_data):
-            self._rewrite_ser_data(ser, series_data)
+        self._adjust_ser_count(plotArea, len(chart_data))
+        for ser, series_data in zip(plotArea.sers, chart_data):
+            self._rewrite_ser_data(ser, series_data, date_1904)
 
-    def _add_cloned_sers(self, chartSpace, count):
+    def _add_cloned_sers(self, plotArea, count):
         """
-        Add `c:ser` elements to the last xChart element in *chartSpace*,
-        cloned from the last `c:ser` child of that xChart.
+        Add `c:ser` elements to the last xChart element in *plotArea*, cloned
+        from the last `c:ser` child of that last xChart.
         """
-        def clone_ser(ser, idx):
+        def clone_ser(ser):
             new_ser = deepcopy(ser)
-            new_ser.idx.val = idx
-            new_ser.order.val = idx
+            new_ser.idx.val = plotArea.next_idx
+            new_ser.order.val = plotArea.next_order
             ser.addnext(new_ser)
             return new_ser
 
-        last_ser = chartSpace.last_doc_order_ser
-        starting_idx = len(chartSpace.sers)
-        for idx in range(starting_idx, starting_idx+count):
-            last_ser = clone_ser(last_ser, idx)
+        last_ser = plotArea.last_ser
+        for _ in range(count):
+            last_ser = clone_ser(last_ser)
 
-    def _adjust_ser_count(self, chartSpace, new_ser_count):
+    def _adjust_ser_count(self, plotArea, new_ser_count):
         """
-        Return the ser elements in *chartSpace* after adjusting their number
-        to *new_ser_count*. The ser elements returned are ordered by
-        increasing c:ser/c:idx value, starting with 0 and with any gaps in
-        numbering collapsed.
+        Adjust the number of c:ser elements in *plotArea* to *new_ser_count*.
+        Excess c:ser elements are deleted from the end, along with any xChart
+        elements that are left empty as a result. Series elements are
+        considered in xChart + series order. Any new c:ser elements required
+        are added to the last xChart element and cloned from the last c:ser
+        element in that xChart.
         """
-        ser_count_diff = new_ser_count - len(chartSpace.sers)
+        ser_count_diff = new_ser_count - len(plotArea.sers)
         if ser_count_diff > 0:
-            self._add_cloned_sers(chartSpace, ser_count_diff)
+            self._add_cloned_sers(plotArea, ser_count_diff)
         elif ser_count_diff < 0:
-            self._trim_ser_count_by(chartSpace, abs(ser_count_diff))
-        return chartSpace.sers
+            self._trim_ser_count_by(plotArea, abs(ser_count_diff))
 
-    def _rewrite_ser_data(self, ser, series_data):
+    def _rewrite_ser_data(self, ser, series_data, date_1904):
         """
         Rewrite selected child elements of *ser* based on the values in
         *series_data*.
         """
         raise NotImplementedError('must be implemented by each subclass')
 
-    def _trim_ser_count_by(self, chartSpace, count):
+    def _trim_ser_count_by(self, plotArea, count):
         """
-        Remove the last *count* ser elements from *chartSpace*. Any xChart
+        Remove the last *count* ser elements from *plotArea*. Any xChart
         elements having no ser child elements after trimming are also
         removed.
         """
-        extra_sers = chartSpace.sers[-count:]
+        extra_sers = plotArea.sers[-count:]
         for ser in extra_sers:
             parent = ser.getparent()
             parent.remove(ser)
         extra_xCharts = [
-            xChart for xChart in chartSpace.chart.plotArea.iter_plots()
-            if len(list(xChart.iter_sers())) == 0
+            xChart for xChart in plotArea.iter_xCharts()
+            if len(xChart.sers) == 0
         ]
         for xChart in extra_xCharts:
             parent = xChart.getparent()
@@ -324,24 +327,7 @@ class _AreaChartXmlWriter(_BaseChartXmlWriter):
             '        <c:axId val="-2101159928"/>\n'
             '        <c:axId val="-2100718248"/>\n'
             '      </c:areaChart>\n'
-            '      <c:catAx>\n'
-            '        <c:axId val="-2101159928"/>\n'
-            '        <c:scaling>\n'
-            '          <c:orientation val="minMax"/>\n'
-            '        </c:scaling>\n'
-            '        <c:delete val="0"/>\n'
-            '        <c:axPos val="b"/>\n'
-            '        <c:numFmt formatCode="General" sourceLinked="1"/>\n'
-            '        <c:majorTickMark val="out"/>\n'
-            '        <c:minorTickMark val="none"/>\n'
-            '        <c:tickLblPos val="nextTo"/>\n'
-            '        <c:crossAx val="-2100718248"/>\n'
-            '        <c:crosses val="autoZero"/>\n'
-            '        <c:auto val="1"/>\n'
-            '        <c:lblAlgn val="ctr"/>\n'
-            '        <c:lblOffset val="100"/>\n'
-            '        <c:noMultiLvlLbl val="0"/>\n'
-            '      </c:catAx>\n'
+            '{cat_ax_xml}'
             '      <c:valAx>\n'
             '        <c:axId val="-2100718248"/>\n'
             '        <c:scaling>\n'
@@ -382,7 +368,56 @@ class _AreaChartXmlWriter(_BaseChartXmlWriter):
         ).format(**{
             'grouping_xml': self._grouping_xml,
             'ser_xml':      self._ser_xml,
+            'cat_ax_xml':   self._cat_ax_xml,
         })
+
+    @property
+    def _cat_ax_xml(self):
+        categories = self._chart_data.categories
+
+        if categories.are_dates:
+            return (
+                '      <c:dateAx>\n'
+                '        <c:axId val="-2101159928"/>\n'
+                '        <c:scaling>\n'
+                '          <c:orientation val="minMax"/>\n'
+                '        </c:scaling>\n'
+                '        <c:delete val="0"/>\n'
+                '        <c:axPos val="b"/>\n'
+                '        <c:numFmt formatCode="{nf}" sourceLinked="1"/>\n'
+                '        <c:majorTickMark val="out"/>\n'
+                '        <c:minorTickMark val="none"/>\n'
+                '        <c:tickLblPos val="nextTo"/>\n'
+                '        <c:crossAx val="-2100718248"/>\n'
+                '        <c:crosses val="autoZero"/>\n'
+                '        <c:auto val="1"/>\n'
+                '        <c:lblOffset val="100"/>\n'
+                '        <c:baseTimeUnit val="days"/>\n'
+                '      </c:dateAx>\n'
+            ).format(**{
+                'nf': categories.number_format,
+            })
+
+        return (
+            '      <c:catAx>\n'
+            '        <c:axId val="-2101159928"/>\n'
+            '        <c:scaling>\n'
+            '          <c:orientation val="minMax"/>\n'
+            '        </c:scaling>\n'
+            '        <c:delete val="0"/>\n'
+            '        <c:axPos val="b"/>\n'
+            '        <c:numFmt formatCode="General" sourceLinked="1"/>\n'
+            '        <c:majorTickMark val="out"/>\n'
+            '        <c:minorTickMark val="none"/>\n'
+            '        <c:tickLblPos val="nextTo"/>\n'
+            '        <c:crossAx val="-2100718248"/>\n'
+            '        <c:crosses val="autoZero"/>\n'
+            '        <c:auto val="1"/>\n'
+            '        <c:lblAlgn val="ctr"/>\n'
+            '        <c:lblOffset val="100"/>\n'
+            '        <c:noMultiLvlLbl val="0"/>\n'
+            '      </c:catAx>\n'
+        )
 
     @property
     def _grouping_xml(self):
@@ -428,6 +463,7 @@ class _BarChartXmlWriter(_BaseChartXmlWriter):
             'gml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/draw'
             'ingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/off'
             'iceDocument/2006/relationships">\n'
+            '  <c:date1904 val="0"/>\n'
             '  <c:chart>\n'
             '    <c:plotArea>\n'
             '      <c:barChart>\n'
@@ -438,20 +474,7 @@ class _BarChartXmlWriter(_BaseChartXmlWriter):
             '        <c:axId val="-2068027336"/>\n'
             '        <c:axId val="-2113994440"/>\n'
             '      </c:barChart>\n'
-            '      <c:catAx>\n'
-            '        <c:axId val="-2068027336"/>\n'
-            '        <c:scaling/>\n'
-            '        <c:delete val="0"/>\n'
-            '        <c:axPos val="{cat_ax_pos}"/>\n'
-            '        <c:majorTickMark val="out"/>\n'
-            '        <c:minorTickMark val="none"/>\n'
-            '        <c:tickLblPos val="nextTo"/>\n'
-            '        <c:crossAx val="-2113994440"/>\n'
-            '        <c:crosses val="autoZero"/>\n'
-            '        <c:lblAlgn val="ctr"/>\n'
-            '        <c:lblOffset val="100"/>\n'
-            '        <c:noMultiLvlLbl val="0"/>\n'
-            '      </c:catAx>\n'
+            '{cat_ax_xml}'
             '      <c:valAx>\n'
             '        <c:axId val="-2113994440"/>\n'
             '        <c:scaling/>\n'
@@ -465,6 +488,7 @@ class _BarChartXmlWriter(_BaseChartXmlWriter):
             '        <c:crosses val="autoZero"/>\n'
             '      </c:valAx>\n'
             '    </c:plotArea>\n'
+            '    <c:dispBlanksAs val="gap"/>\n'
             '  </c:chart>\n'
             '  <c:txPr>\n'
             '    <a:bodyPr/>\n'
@@ -482,7 +506,7 @@ class _BarChartXmlWriter(_BaseChartXmlWriter):
             'grouping_xml': self._grouping_xml,
             'ser_xml':      self._ser_xml,
             'overlap_xml':  self._overlap_xml,
-            'cat_ax_pos':   self._cat_ax_pos,
+            'cat_ax_xml':   self._cat_ax_xml,
             'val_ax_pos':   self._val_ax_pos,
         })
 
@@ -513,6 +537,56 @@ class _BarChartXmlWriter(_BaseChartXmlWriter):
             XL_CHART_TYPE.COLUMN_STACKED:     'b',
             XL_CHART_TYPE.COLUMN_STACKED_100: 'b',
         }[self._chart_type]
+
+    @property
+    def _cat_ax_xml(self):
+        categories = self._chart_data.categories
+
+        if categories.are_dates:
+            return (
+                '      <c:dateAx>\n'
+                '        <c:axId val="-2068027336"/>\n'
+                '        <c:scaling>\n'
+                '          <c:orientation val="minMax"/>\n'
+                '        </c:scaling>\n'
+                '        <c:delete val="0"/>\n'
+                '        <c:axPos val="{cat_ax_pos}"/>\n'
+                '        <c:numFmt formatCode="{nf}" sourceLinked="1"/>\n'
+                '        <c:majorTickMark val="out"/>\n'
+                '        <c:minorTickMark val="none"/>\n'
+                '        <c:tickLblPos val="nextTo"/>\n'
+                '        <c:crossAx val="-2113994440"/>\n'
+                '        <c:crosses val="autoZero"/>\n'
+                '        <c:auto val="1"/>\n'
+                '        <c:lblOffset val="100"/>\n'
+                '        <c:baseTimeUnit val="days"/>\n'
+                '      </c:dateAx>\n'
+            ).format(**{
+                'cat_ax_pos': self._cat_ax_pos,
+                'nf':         categories.number_format,
+            })
+
+        return (
+            '      <c:catAx>\n'
+            '        <c:axId val="-2068027336"/>\n'
+            '        <c:scaling>\n'
+            '          <c:orientation val="minMax"/>\n'
+            '        </c:scaling>\n'
+            '        <c:delete val="0"/>\n'
+            '        <c:axPos val="{cat_ax_pos}"/>\n'
+            '        <c:majorTickMark val="out"/>\n'
+            '        <c:minorTickMark val="none"/>\n'
+            '        <c:tickLblPos val="nextTo"/>\n'
+            '        <c:crossAx val="-2113994440"/>\n'
+            '        <c:crosses val="autoZero"/>\n'
+            '        <c:auto val="1"/>\n'
+            '        <c:lblAlgn val="ctr"/>\n'
+            '        <c:lblOffset val="100"/>\n'
+            '        <c:noMultiLvlLbl val="0"/>\n'
+            '      </c:catAx>\n'
+        ).format(**{
+            'cat_ax_pos': self._cat_ax_pos,
+        })
 
     @property
     def _grouping_xml(self):
@@ -677,29 +751,20 @@ class _LineChartXmlWriter(_BaseChartXmlWriter):
             'gml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/draw'
             'ingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/off'
             'iceDocument/2006/relationships">\n'
+            '  <c:date1904 val="0"/>\n'
             '  <c:chart>\n'
+            '    <c:autoTitleDeleted val="0"/>\n'
             '    <c:plotArea>\n'
             '      <c:lineChart>\n'
             '{grouping_xml}'
+            '        <c:varyColors val="0"/>\n'
             '{ser_xml}'
             '        <c:marker val="1"/>\n'
+            '        <c:smooth val="0"/>\n'
             '        <c:axId val="2118791784"/>\n'
             '        <c:axId val="2140495176"/>\n'
             '      </c:lineChart>\n'
-            '      <c:catAx>\n'
-            '        <c:axId val="2118791784"/>\n'
-            '        <c:scaling/>\n'
-            '        <c:delete val="0"/>\n'
-            '        <c:axPos val="b"/>\n'
-            '        <c:majorTickMark val="out"/>\n'
-            '        <c:minorTickMark val="none"/>\n'
-            '        <c:tickLblPos val="nextTo"/>\n'
-            '        <c:crossAx val="2140495176"/>\n'
-            '        <c:crosses val="autoZero"/>\n'
-            '        <c:lblAlgn val="ctr"/>\n'
-            '        <c:lblOffset val="100"/>\n'
-            '        <c:noMultiLvlLbl val="0"/>\n'
-            '      </c:catAx>\n'
+            '{cat_ax_xml}'
             '      <c:valAx>\n'
             '        <c:axId val="2140495176"/>\n'
             '        <c:scaling/>\n'
@@ -713,6 +778,14 @@ class _LineChartXmlWriter(_BaseChartXmlWriter):
             '        <c:crosses val="autoZero"/>\n'
             '      </c:valAx>\n'
             '    </c:plotArea>\n'
+            '    <c:legend>\n'
+            '      <c:legendPos val="r"/>\n'
+            '      <c:layout/>\n'
+            '      <c:overlay val="0"/>\n'
+            '    </c:legend>\n'
+            '    <c:plotVisOnly val="1"/>\n'
+            '    <c:dispBlanksAs val="gap"/>\n'
+            '    <c:showDLblsOverMax val="0"/>\n'
             '  </c:chart>\n'
             '  <c:txPr>\n'
             '    <a:bodyPr/>\n'
@@ -728,7 +801,55 @@ class _LineChartXmlWriter(_BaseChartXmlWriter):
         ).format(**{
             'grouping_xml': self._grouping_xml,
             'ser_xml':      self._ser_xml,
+            'cat_ax_xml':   self._cat_ax_xml,
         })
+
+    @property
+    def _cat_ax_xml(self):
+        categories = self._chart_data.categories
+
+        if categories.are_dates:
+            return (
+                '      <c:dateAx>\n'
+                '        <c:axId val="2118791784"/>\n'
+                '        <c:scaling>\n'
+                '          <c:orientation val="minMax"/>\n'
+                '        </c:scaling>\n'
+                '        <c:delete val="0"/>\n'
+                '        <c:axPos val="b"/>\n'
+                '        <c:numFmt formatCode="{nf}" sourceLinked="1"/>\n'
+                '        <c:majorTickMark val="out"/>\n'
+                '        <c:minorTickMark val="none"/>\n'
+                '        <c:tickLblPos val="nextTo"/>\n'
+                '        <c:crossAx val="2140495176"/>\n'
+                '        <c:crosses val="autoZero"/>\n'
+                '        <c:auto val="1"/>\n'
+                '        <c:lblOffset val="100"/>\n'
+                '        <c:baseTimeUnit val="days"/>\n'
+                '      </c:dateAx>\n'
+            ).format(**{
+                'nf': categories.number_format,
+            })
+
+        return (
+            '      <c:catAx>\n'
+            '        <c:axId val="2118791784"/>\n'
+            '        <c:scaling>\n'
+            '          <c:orientation val="minMax"/>\n'
+            '        </c:scaling>\n'
+            '        <c:delete val="0"/>\n'
+            '        <c:axPos val="b"/>\n'
+            '        <c:majorTickMark val="out"/>\n'
+            '        <c:minorTickMark val="none"/>\n'
+            '        <c:tickLblPos val="nextTo"/>\n'
+            '        <c:crossAx val="2140495176"/>\n'
+            '        <c:crosses val="autoZero"/>\n'
+            '        <c:auto val="1"/>\n'
+            '        <c:lblAlgn val="ctr"/>\n'
+            '        <c:lblOffset val="100"/>\n'
+            '        <c:noMultiLvlLbl val="0"/>\n'
+            '      </c:catAx>\n'
+        )
 
     @property
     def _grouping_xml(self):
@@ -805,6 +926,7 @@ class _PieChartXmlWriter(_BaseChartXmlWriter):
             '{ser_xml}'
             '      </c:pieChart>\n'
             '    </c:plotArea>\n'
+            '    <c:dispBlanksAs val="gap"/>\n'
             '  </c:chart>\n'
             '  <c:txPr>\n'
             '    <a:bodyPr/>\n'
@@ -1253,6 +1375,18 @@ class _CategorySeriesXmlWriter(_BaseSeriesXmlWriter):
         element.
         """
         categories = self._series.categories
+
+        if categories.are_numeric:
+            return parse_xml(
+                self._numRef_cat_tmpl.format(**{
+                    'wksht_ref':     self._series.categories_ref,
+                    'number_format': categories.number_format,
+                    'cat_count':     categories.leaf_count,
+                    'cat_pt_xml':    self._cat_num_pt_xml,
+                    'nsdecls':       ' %s' % nsdecls('c'),
+                })
+            )
+
         if categories.depth == 1:
             return parse_xml(
                 self._cat_tmpl.format(**{
@@ -1262,6 +1396,7 @@ class _CategorySeriesXmlWriter(_BaseSeriesXmlWriter):
                     'nsdecls':    ' %s' % nsdecls('c'),
                 })
             )
+
         return parse_xml(
             self._multiLvl_cat_tmpl.format(**{
                 'wksht_ref': self._series.categories_ref,
@@ -1278,6 +1413,16 @@ class _CategorySeriesXmlWriter(_BaseSeriesXmlWriter):
         containing the category labels and spreadsheet reference.
         """
         categories = self._series.categories
+
+        if categories.are_numeric:
+            return self._numRef_cat_tmpl.format(**{
+                'wksht_ref':     self._series.categories_ref,
+                'number_format': categories.number_format,
+                'cat_count':     categories.leaf_count,
+                'cat_pt_xml':    self._cat_num_pt_xml,
+                'nsdecls':       '',
+            })
+
         if categories.depth == 1:
             return self._cat_tmpl.format(**{
                 'wksht_ref':  self._series.categories_ref,
@@ -1285,6 +1430,7 @@ class _CategorySeriesXmlWriter(_BaseSeriesXmlWriter):
                 'cat_pt_xml': self._cat_pt_xml,
                 'nsdecls':    '',
             })
+
         return self._multiLvl_cat_tmpl.format(**{
             'wksht_ref': self._series.categories_ref,
             'cat_count': categories.leaf_count,
@@ -1322,6 +1468,24 @@ class _CategorySeriesXmlWriter(_BaseSeriesXmlWriter):
         })
 
     @property
+    def _cat_num_pt_xml(self):
+        """
+        The unicode XML snippet for the ``<c:pt>`` elements when category
+        labels are numeric (including date type).
+        """
+        xml = ''
+        for idx, category in enumerate(self._series.categories):
+            xml += (
+                '                <c:pt idx="{cat_idx}">\n'
+                '                  <c:v>{cat_lbl_str}</c:v>\n'
+                '                </c:pt>\n'
+            ).format(**{
+                'cat_idx':     idx,
+                'cat_lbl_str': category.numeric_str_val(self._date_1904),
+            })
+        return xml
+
+    @property
     def _cat_pt_xml(self):
         """
         The unicode XML snippet for the ``<c:pt>`` elements containing the
@@ -1330,12 +1494,12 @@ class _CategorySeriesXmlWriter(_BaseSeriesXmlWriter):
         xml = ''
         for idx, category in enumerate(self._series.categories):
             xml += (
-                '                <c:pt idx="{cat_name_idx}">\n'
-                '                  <c:v>{cat_name}</c:v>\n'
+                '                <c:pt idx="{cat_idx}">\n'
+                '                  <c:v>{cat_label}</c:v>\n'
                 '                </c:pt>\n'
             ).format(**{
-                'cat_name_idx': idx,
-                'cat_name':     escape(str(category.name)),
+                'cat_idx':   idx,
+                'cat_label': escape(to_unicode(category.label)),
             })
         return xml
 
@@ -1369,7 +1533,7 @@ class _CategorySeriesXmlWriter(_BaseSeriesXmlWriter):
                     '                  <c:pt idx="%d">\n'
                     '                    <c:v>%s</c:v>\n'
                     '                  </c:pt>\n'
-                ) % (idx, escape(str(name)))
+                ) % (idx, escape('%s' % name))
             return xml
 
         xml = ''
@@ -1398,6 +1562,25 @@ class _CategorySeriesXmlWriter(_BaseSeriesXmlWriter):
             '{lvl_xml}'
             '              </c:multiLvlStrCache>\n'
             '            </c:multiLvlStrRef>\n'
+            '          </c:cat>\n'
+        )
+
+    @property
+    def _numRef_cat_tmpl(self):
+        """
+        The template for the ``<c:cat>`` element for this series when the
+        labels are numeric (or date) values.
+        """
+        return (
+            '          <c:cat{nsdecls}>\n'
+            '            <c:numRef>\n'
+            '              <c:f>{wksht_ref}</c:f>\n'
+            '              <c:numCache>\n'
+            '                <c:formatCode>{number_format}</c:formatCode>\n'
+            '                <c:ptCount val="{cat_count}"/>\n'
+            '{cat_pt_xml}'
+            '              </c:numCache>\n'
+            '            </c:numRef>\n'
             '          </c:cat>\n'
         )
 
@@ -1581,7 +1764,7 @@ class _BubbleSeriesXmlRewriter(_BaseSeriesXmlRewriter):
     """
     A series rewriter suitable for bubble charts.
     """
-    def _rewrite_ser_data(self, ser, series_data):
+    def _rewrite_ser_data(self, ser, series_data, date_1904):
         """
         Rewrite the ``<c:tx>``, ``<c:cat>`` and ``<c:val>`` child elements
         of *ser* based on the values in *series_data*.
@@ -1603,7 +1786,7 @@ class _CategorySeriesXmlRewriter(_BaseSeriesXmlRewriter):
     """
     A series rewriter suitable for category charts.
     """
-    def _rewrite_ser_data(self, ser, series_data):
+    def _rewrite_ser_data(self, ser, series_data, date_1904):
         """
         Rewrite the ``<c:tx>``, ``<c:cat>`` and ``<c:val>`` child elements
         of *ser* based on the values in *series_data*.
@@ -1612,7 +1795,7 @@ class _CategorySeriesXmlRewriter(_BaseSeriesXmlRewriter):
         ser._remove_cat()
         ser._remove_val()
 
-        xml_writer = _CategorySeriesXmlWriter(series_data)
+        xml_writer = _CategorySeriesXmlWriter(series_data, date_1904)
 
         ser._insert_tx(xml_writer.tx)
         ser._insert_cat(xml_writer.cat)
@@ -1623,7 +1806,7 @@ class _XySeriesXmlRewriter(_BaseSeriesXmlRewriter):
     """
     A series rewriter suitable for XY (aka. scatter) charts.
     """
-    def _rewrite_ser_data(self, ser, series_data):
+    def _rewrite_ser_data(self, ser, series_data, date_1904):
         """
         Rewrite the ``<c:tx>``, ``<c:xVal>`` and ``<c:yVal>`` child elements
         of *ser* based on the values in *series_data*.

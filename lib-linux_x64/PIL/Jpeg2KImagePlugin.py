@@ -12,7 +12,7 @@
 #
 # See the README file for information on usage and redistribution.
 #
-from PIL import Image, ImageFile
+from . import Image, ImageFile
 import struct
 import os
 import io
@@ -84,6 +84,7 @@ def _parse_jp2_header(fp):
     size = None
     mode = None
     bpc = None
+    nc = None
 
     hio = io.BytesIO(header)
     while True:
@@ -141,6 +142,9 @@ def _parse_jp2_header(fp):
                         mode = 'RGBA'
                     break
 
+    if size is None or mode is None:
+        raise SyntaxError("Malformed jp2 header")
+
     return (size, mode)
 
 ##
@@ -188,7 +192,7 @@ class Jpeg2KImageFile(ImageFile.ImageFile):
                 length = -1
 
         self.tile = [('jpeg2k', (0, 0) + self.size, 0,
-                      (self.codec, self.reduce, self.layers, fd, length))]
+                      (self.codec, self.reduce, self.layers, fd, length, self.fp))]
 
     def load(self):
         if self.reduce:
@@ -203,7 +207,7 @@ class Jpeg2KImageFile(ImageFile.ImageFile):
             t3 = (t[3][0], self.reduce, self.layers, t[3][3], t[3][4])
             self.tile = [(t[0], (0, 0) + self.size, t[2], t3)]
 
-        ImageFile.ImageFile.load(self)
+        return ImageFile.ImageFile.load(self)
 
 
 def _accept(prefix):

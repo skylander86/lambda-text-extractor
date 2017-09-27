@@ -51,7 +51,6 @@ form of custom URL resolvers.
 """
 
 from lxml import etree
-import copy
 try:
     from urlparse import urljoin
     from urllib2 import urlopen
@@ -60,16 +59,11 @@ except ImportError:
     from urllib.parse import urljoin
     from urllib.request import urlopen
 
-try:
-    set
-except NameError:
-    # Python 2.3
-    from sets import Set as set
-
 XINCLUDE = "{http://www.w3.org/2001/XInclude}"
 
 XINCLUDE_INCLUDE = XINCLUDE + "include"
 XINCLUDE_FALLBACK = XINCLUDE + "fallback"
+XINCLUDE_ITER_TAG = XINCLUDE + "*"
 
 ##
 # Fatal include error.
@@ -167,7 +161,7 @@ def _include(elem, loader=None, _parent_hrefs=None, base_url=None):
     parser = elem.getroottree().parser
 
     include_elements = list(
-        elem.iter('{http://www.w3.org/2001/XInclude}*'))
+        elem.iter(XINCLUDE_ITER_TAG))
 
     for e in include_elements:
         if e.tag == XINCLUDE_INCLUDE:

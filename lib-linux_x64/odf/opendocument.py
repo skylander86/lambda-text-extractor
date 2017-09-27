@@ -369,7 +369,7 @@ class OpenDocument:
             stylenamelist = self._parseoneelement(top, stylenamelist)
         stylelist = []
         for e in self.automaticstyles.childNodes:
-            if e.getAttrNS(STYLENS,u'name') in stylenamelist:
+            if isinstance(e, element.Element) and e.getAttrNS(STYLENS,u'name') in stylenamelist:
                 stylelist.append(e)
 
         # check the type of the returned data
@@ -674,7 +674,7 @@ class OpenDocument:
             zi = zipfile.ZipInfo(u"%ssettings.xml" % folder, self._now)
             zi.compress_type = zipfile.ZIP_DEFLATED
             zi.external_attr = UNIXPERMS
-            self._z.writestr(zi, anObject.settingsxml() )
+            self._z.writestr(zi, anObject.settingsxml().encode("utf-8") )
 
         # Write meta
         if self == anObject:
@@ -682,7 +682,7 @@ class OpenDocument:
             zi = zipfile.ZipInfo(u"meta.xml", self._now)
             zi.compress_type = zipfile.ZIP_DEFLATED
             zi.external_attr = UNIXPERMS
-            self._z.writestr(zi, anObject.metaxml() )
+            self._z.writestr(zi, anObject.metaxml().encode("utf-8") )
 
         # Write subobjects
         subobjectnum = 1
@@ -881,6 +881,7 @@ def __loadxmlparts(z, manifest, doc, objectpath):
 
             parser = make_parser()
             parser.setFeature(handler.feature_namespaces, 1)
+            parser.setFeature(handler.feature_external_ges, 0)
             parser.setContentHandler(LoadParser(doc))
             parser.setErrorHandler(handler.ErrorHandler())
 

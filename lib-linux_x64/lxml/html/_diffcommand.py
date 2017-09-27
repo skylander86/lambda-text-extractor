@@ -1,8 +1,10 @@
+from __future__ import absolute_import
+
 import optparse
 import sys
 import re
 import os
-from lxml.html.diff import htmldiff
+from .diff import htmldiff
 
 description = """\
 """
@@ -71,6 +73,7 @@ body_end_re = re.compile(
     r"</body.*?>", re.I|re.S)
     
 def split_body(html):
+    pre = post = ''
     match = body_start_re.search(html)
     if match:
         pre = html[:match.end()]

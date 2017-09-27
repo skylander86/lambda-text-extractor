@@ -1,0 +1,11 @@
+--- catdoc-0.95/src/catdoc.c	2017-07-29 12:05:59.978129654 +0000
++++ catdoc_customrc.c	2017-07-29 12:06:31.357881389 +0000
+@@ -45,7 +45,7 @@
+ 	_argv=argv;
+ 	_argc=argc;
+ #endif
+-	tempname = getenv("CATDOCRC_PATH");
++	tempname = getenv("CATDOCRC_PATH");
+ 	if (tempname) read_config_file(tempname);
+ #ifdef HAVE_LANGINFO
+ 	get_locale_charset();

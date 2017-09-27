@@ -9,6 +9,8 @@ from __future__ import (
     absolute_import, division, print_function, unicode_literals
 )
 
+import os
+
 from lxml import etree
 
 from .ns import NamespacePrefixedTag
@@ -18,6 +20,20 @@ from .ns import NamespacePrefixedTag
 element_class_lookup = etree.ElementNamespaceClassLookup()
 oxml_parser = etree.XMLParser(remove_blank_text=True, resolve_entities=False)
 oxml_parser.set_element_class_lookup(element_class_lookup)
+
+
+def parse_from_template(template_name):
+    """
+    Return an element loaded from the XML in the template file identified by
+    *template_name*.
+    """
+    thisdir = os.path.split(__file__)[0]
+    filename = os.path.join(
+        thisdir, '..', 'templates', '%s.xml' % template_name
+    )
+    with open(filename, 'rb') as f:
+        xml = f.read()
+    return parse_xml(xml)
 
 
 def parse_xml(xml):
@@ -46,11 +62,12 @@ register_element_cls('a:hlinkHover', CT_Hyperlink)
 
 
 from .chart.axis import (
-    CT_AxisUnit, CT_CatAx, CT_ChartLines, CT_Crosses, CT_LblOffset,
-    CT_Scaling, CT_TickLblPos, CT_TickMark, CT_ValAx
+    CT_AxisUnit, CT_CatAx, CT_ChartLines, CT_Crosses, CT_DateAx,
+    CT_LblOffset, CT_Scaling, CT_TickLblPos, CT_TickMark, CT_ValAx
 )
 register_element_cls('c:catAx',          CT_CatAx)
 register_element_cls('c:crosses',        CT_Crosses)
+register_element_cls('c:dateAx',         CT_DateAx)
 register_element_cls('c:lblOffset',      CT_LblOffset)
 register_element_cls('c:majorGridlines', CT_ChartLines)
 register_element_cls('c:majorTickMark',  CT_TickMark)
@@ -111,10 +128,13 @@ register_element_cls('c:scatterChart',  CT_ScatterChart)
 
 
 from .chart.series import (
-    CT_DPt, CT_NumDataSource, CT_SeriesComposite, CT_StrVal_NumVal_Composite
+    CT_AxDataSource, CT_DPt, CT_Lvl, CT_NumDataSource, CT_SeriesComposite,
+    CT_StrVal_NumVal_Composite
 )
 register_element_cls('c:bubbleSize', CT_NumDataSource)
+register_element_cls('c:cat',        CT_AxDataSource)
 register_element_cls('c:dPt',        CT_DPt)
+register_element_cls('c:lvl',        CT_Lvl)
 register_element_cls('c:pt',         CT_StrVal_NumVal_Composite)
 register_element_cls('c:ser',        CT_SeriesComposite)
 register_element_cls('c:val',        CT_NumDataSource)
@@ -123,25 +143,29 @@ register_element_cls('c:yVal',       CT_NumDataSource)
 
 
 from .chart.shared import (
-    CT_Boolean, CT_Double, CT_Layout, CT_LayoutMode, CT_ManualLayout,
-    CT_NumFmt, CT_Tx, CT_UnsignedInt
+    CT_Boolean, CT_Boolean_Explicit, CT_Double, CT_Layout, CT_LayoutMode,
+    CT_ManualLayout, CT_NumFmt, CT_Title, CT_Tx, CT_UnsignedInt
 )
 register_element_cls('c:autoUpdate',       CT_Boolean)
 register_element_cls('c:bubble3D',         CT_Boolean)
 register_element_cls('c:crossAx',          CT_UnsignedInt)
 register_element_cls('c:crossesAt',        CT_Double)
+register_element_cls('c:date1904',         CT_Boolean)
 register_element_cls('c:delete',           CT_Boolean)
 register_element_cls('c:idx',              CT_UnsignedInt)
-register_element_cls('c:invertIfNegative', CT_Boolean)
+register_element_cls('c:invertIfNegative', CT_Boolean_Explicit)
 register_element_cls('c:layout',           CT_Layout)
 register_element_cls('c:manualLayout',     CT_ManualLayout)
 register_element_cls('c:max',              CT_Double)
 register_element_cls('c:min',              CT_Double)
 register_element_cls('c:numFmt',           CT_NumFmt)
 register_element_cls('c:order',            CT_UnsignedInt)
-register_element_cls('c:overlay',          CT_Boolean)
-register_element_cls('c:showLegendKey',    CT_Boolean)
+register_element_cls('c:overlay',          CT_Boolean_Explicit)
+register_element_cls('c:ptCount',          CT_UnsignedInt)
+register_element_cls('c:showLegendKey',    CT_Boolean_Explicit)
+register_element_cls('c:showVal',          CT_Boolean_Explicit)
 register_element_cls('c:smooth',           CT_Boolean)
+register_element_cls('c:title',            CT_Title)
 register_element_cls('c:tx',               CT_Tx)
 register_element_cls('c:varyColors',       CT_Boolean)
 register_element_cls('c:x',                CT_Double)
@@ -272,15 +296,21 @@ register_element_cls('a:tr',      CT_TableRow)
 
 
 from .slide import (
-    CT_CommonSlideData, CT_Slide, CT_SlideLayout, CT_SlideLayoutIdList,
-    CT_SlideLayoutIdListEntry, CT_SlideMaster
+    CT_CommonSlideData, CT_NotesMaster, CT_NotesSlide, CT_Slide,
+    CT_SlideLayout, CT_SlideLayoutIdList, CT_SlideLayoutIdListEntry,
+    CT_SlideMaster, CT_SlideTiming, CT_TimeNodeList, CT_TLMediaNodeVideo
 )
+register_element_cls('p:childTnLst',     CT_TimeNodeList)
 register_element_cls('p:cSld',           CT_CommonSlideData)
+register_element_cls('p:notes',          CT_NotesSlide)
+register_element_cls('p:notesMaster',    CT_NotesMaster)
 register_element_cls('p:sld',            CT_Slide)
 register_element_cls('p:sldLayout',      CT_SlideLayout)
 register_element_cls('p:sldLayoutId',    CT_SlideLayoutIdListEntry)
 register_element_cls('p:sldLayoutIdLst', CT_SlideLayoutIdList)
 register_element_cls('p:sldMaster',      CT_SlideMaster)
+register_element_cls('p:timing',         CT_SlideTiming)
+register_element_cls('p:video',          CT_TLMediaNodeVideo)
 
 
 from .text import (
@@ -309,3 +339,7 @@ register_element_cls('a:spcPts',      CT_TextSpacingPoint)
 register_element_cls('a:txBody',      CT_TextBody)
 register_element_cls('c:txPr',        CT_TextBody)
 register_element_cls('p:txBody',      CT_TextBody)
+
+
+from .theme import CT_OfficeStyleSheet
+register_element_cls('a:theme', CT_OfficeStyleSheet)

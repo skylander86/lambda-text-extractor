@@ -11,17 +11,23 @@
 
 # ;-)
 
-VERSION = '1.1.7'  # PIL version
-PILLOW_VERSION = '3.1.1'  # Pillow
+from . import version
+
+VERSION = '1.1.7'  # PIL Version
+PILLOW_VERSION =  version.__version__
+
+__version__ = PILLOW_VERSION
 
 _plugins = ['BmpImagePlugin',
             'BufrStubImagePlugin',
             'CurImagePlugin',
             'DcxImagePlugin',
+            'DdsImagePlugin',
             'EpsImagePlugin',
             'FitsStubImagePlugin',
             'FliImagePlugin',
             'FpxImagePlugin',
+            'FtexImagePlugin',
             'GbrImagePlugin',
             'GifImagePlugin',
             'GribStubImagePlugin',

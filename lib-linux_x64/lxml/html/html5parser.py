@@ -1,15 +1,13 @@
 """
 An interface to html5lib that mimics the lxml.html interface.
 """
-
 import sys
 import string
 
 from html5lib import HTMLParser as _HTMLParser
 from html5lib.treebuilders.etree_lxml import TreeBuilder
-
 from lxml import etree
-from lxml.html import _contains_block_level_tag, XHTML_NAMESPACE, Element
+from lxml.html import Element, XHTML_NAMESPACE, _contains_block_level_tag
 
 # python3 compatibility
 try:
@@ -24,6 +22,7 @@ try:
     from urlparse import urlparse
 except ImportError:
     from urllib.parse import urlparse
+
 
 class HTMLParser(_HTMLParser):
     """An html5lib HTML parser with lxml as tree."""
@@ -53,28 +52,13 @@ def _find_tag(tree, tag):
     return tree.find('{%s}%s' % (XHTML_NAMESPACE, tag))
 
 
-def document_fromstring(html, guess_charset=True, parser=None):
-    """Parse a whole document into a string."""
-    if not isinstance(html, _strings):
-        raise TypeError('string required')
+def document_fromstring(html, guess_charset=None, parser=None):
+    """
+    Parse a whole document into a string.
 
-    if parser is None:
-        parser = html_parser
-
-    return parser.parse(html, useChardet=guess_charset).getroot()
-
-
-def fragments_fromstring(html, no_leading_text=False,
-                         guess_charset=False, parser=None):
-    """Parses several HTML elements, returning a list of elements.
-
-    The first item in the list may be a string.  If no_leading_text is true,
-    then it will be an error if there is leading text, and it will always be
-    a list of only elements.
-
-    If `guess_charset` is `True` and the text was not unicode but a
-    bytestring, the `chardet` library will perform charset guessing on the
-    string.
+    If `guess_charset` is true, or if the input is not Unicode but a
+    byte string, the `chardet` library will perform charset guessing
+    on the string.
     """
     if not isinstance(html, _strings):
         raise TypeError('string required')
@@ -82,7 +66,41 @@ def fragments_fromstring(html, no_leading_text=False,
     if parser is None:
         parser = html_parser
 
-    children = parser.parseFragment(html, 'div', useChardet=guess_charset)
+    options = {}
+    if guess_charset is None and isinstance(html, bytes):
+        # html5lib does not accept useChardet as an argument, if it
+        # detected the html argument would produce unicode objects.
+        guess_charset = True
+    if guess_charset is not None:
+        options['useChardet'] = guess_charset
+    return parser.parse(html, **options).getroot()
+
+
+def fragments_fromstring(html, no_leading_text=False,
+                         guess_charset=None, parser=None):
+    """Parses several HTML elements, returning a list of elements.
+
+    The first item in the list may be a string.  If no_leading_text is true,
+    then it will be an error if there is leading text, and it will always be
+    a list of only elements.
+
+    If `guess_charset` is true, the `chardet` library will perform charset
+    guessing on the string.
+    """
+    if not isinstance(html, _strings):
+        raise TypeError('string required')
+
+    if parser is None:
+        parser = html_parser
+
+    options = {}
+    if guess_charset is None and isinstance(html, bytes):
+        # html5lib does not accept useChardet as an argument, if it
+        # detected the html argument would produce unicode objects.
+        guess_charset = False
+    if guess_charset is not None:
+        options['useChardet'] = guess_charset
+    children = parser.parseFragment(html, 'div', **options)
     if children and isinstance(children[0], _strings):
         if no_leading_text:
             if children[0].strip():
@@ -93,14 +111,17 @@ def fragments_fromstring(html, no_leading_text=False,
 
 
 def fragment_fromstring(html, create_parent=False,
-                        guess_charset=False, parser=None):
+                        guess_charset=None, parser=None):
     """Parses a single HTML element; it is an error if there is more than
     one element, or if anything but whitespace precedes or follows the
     element.
 
-    If create_parent is true (or is a tag name) then a parent node
+    If 'create_parent' is true (or is a tag name) then a parent node
     will be created to encapsulate the HTML in a single element.  In
     this case, leading or trailing text is allowed.
+
+    If `guess_charset` is true, the `chardet` library will perform charset
+    guessing on the string.
     """
     if not isinstance(html, _strings):
         raise TypeError('string required')
@@ -133,13 +154,18 @@ def fragment_fromstring(html, create_parent=False,
     return result
 
 
-def fromstring(html, guess_charset=True, parser=None):
+def fromstring(html, guess_charset=None, parser=None):
     """Parse the html, returning a single element/document.
 
     This tries to minimally parse the chunk of text, without knowing if it
     is a fragment or a document.
 
-    base_url will set the document's base_url attribute (and the tree's docinfo.URL)
+    'base_url' will set the document's base_url attribute (and the tree's
+    docinfo.URL)
+
+    If `guess_charset` is true, or if the input is not Unicode but a
+    byte string, the `chardet` library will perform charset guessing
+    on the string.
     """
     if not isinstance(html, _strings):
         raise TypeError('string required')
@@ -147,7 +173,14 @@ def fromstring(html, guess_charset=True, parser=None):
                               guess_charset=guess_charset)
 
     # document starts with doctype or <html>, full document!
-    start = html[:50].lstrip().lower()
+    start = html[:50]
+    if isinstance(start, bytes):
+        # Allow text comparison in python3.
+        # Decode as ascii, that also covers latin-1 and utf-8 for the
+        # characters we need.
+        start = start.decode('ascii', 'replace')
+
+    start = start.lstrip().lower()
     if start.startswith('<html') or start.startswith('<!doctype'):
         return doc
 
@@ -175,20 +208,40 @@ def fromstring(html, guess_charset=True, parser=None):
     return body
 
 
-def parse(filename_url_or_file, guess_charset=True, parser=None):
+def parse(filename_url_or_file, guess_charset=None, parser=None):
     """Parse a filename, URL, or file-like object into an HTML document
     tree.  Note: this returns a tree, not an element.  Use
     ``parse(...).getroot()`` to get the document root.
+
+    If ``guess_charset`` is true, the ``useChardet`` option is passed into
+    html5lib to enable character detection.  This option is on by default
+    when parsing from URLs, off by default when parsing from file(-like)
+    objects (which tend to return Unicode more often than not), and on by
+    default when parsing from a file path (which is read in binary mode).
     """
     if parser is None:
         parser = html_parser
     if not isinstance(filename_url_or_file, _strings):
         fp = filename_url_or_file
+        if guess_charset is None:
+            # assume that file-like objects return Unicode more often than bytes
+            guess_charset = False
     elif _looks_like_url(filename_url_or_file):
         fp = urlopen(filename_url_or_file)
+        if guess_charset is None:
+            # assume that URLs return bytes
+            guess_charset = True
     else:
         fp = open(filename_url_or_file, 'rb')
-    return parser.parse(fp, useChardet=guess_charset)
+        if guess_charset is None:
+            guess_charset = True
+
+    options = {}
+    # html5lib does not accept useChardet as an argument, if it
+    # detected the html argument would produce unicode objects.
+    if guess_charset:
+        options['useChardet'] = guess_charset
+    return parser.parse(fp, **options)
 
 
 def _looks_like_url(str):

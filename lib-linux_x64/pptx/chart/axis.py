@@ -8,11 +8,11 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 from ..dml.chtfmt import ChartFormat
 from ..enum.chart import (
-    XL_AXIS_CROSSES, XL_TICK_LABEL_POSITION, XL_TICK_MARK
+    XL_AXIS_CROSSES, XL_CATEGORY_TYPE, XL_TICK_LABEL_POSITION, XL_TICK_MARK
 )
 from ..oxml.ns import qn
 from ..shared import ElementProxy
-from ..text.text import Font
+from ..text.text import Font, TextFrame
 from ..util import lazyproperty
 
 
@@ -25,6 +25,17 @@ class _BaseAxis(object):
         super(_BaseAxis, self).__init__()
         self._element = xAx  # axis element, c:catAx or c:valAx
         self._xAx = xAx
+
+    @property
+    def axis_title(self):
+        """An |AxisTitle| object providing access to title properties.
+
+        Calling this property is destructive in the sense that it adds an
+        axis title element (`c:title`) to the axis XML if one is not already
+        present. Use :attr:`has_title` to test for presence of axis title
+        non-destructively.
+        """
+        return AxisTitle(self._element.get_or_add_title())
 
     @lazyproperty
     def format(self):
@@ -71,6 +82,25 @@ class _BaseAxis(object):
             self._element.get_or_add_minorGridlines()
         else:
             self._element._remove_minorGridlines()
+
+    @property
+    def has_title(self):
+        """Read/write boolean specifying whether this axis has a title.
+
+        |True| if this axis has a title, |False| otherwise. Assigning |True|
+        causes an axis title to be added if not already present. Assigning
+        |False| causes any existing title to be deleted.
+        """
+        if self._element.title is None:
+            return False
+        return True
+
+    @has_title.setter
+    def has_title(self, value):
+        if bool(value) is True:
+            self._element.get_or_add_title()
+        else:
+            self._element._remove_title()
 
     @lazyproperty
     def major_gridlines(self):
@@ -180,7 +210,7 @@ class _BaseAxis(object):
         """
         Read/write. |True| if axis is visible, |False| otherwise.
         """
-        delete = self._element.delete
+        delete = self._element.delete_
         if delete is None:
             return False
         return False if delete.val else True
@@ -191,14 +221,87 @@ class _BaseAxis(object):
             raise ValueError(
                 "assigned value must be True or False, got: %s" % value
             )
-        delete = self._element.get_or_add_delete()
+        delete = self._element.get_or_add_delete_()
         delete.val = not value
+
+
+class AxisTitle(ElementProxy):
+    """Provides properties for manipulating axis title."""
+
+    __slots__ = ('_title', '_format')
+
+    def __init__(self, title):
+        super(AxisTitle, self).__init__(title)
+        self._title = title
+
+    @lazyproperty
+    def format(self):
+        """|ChartFormat| object providing access to shape formatting.
+
+        Return the |ChartFormat| object providing shape formatting properties
+        for this axis title, such as its line color and fill.
+        """
+        return ChartFormat(self._element)
+
+    @property
+    def has_text_frame(self):
+        """Read/write Boolean specifying presence of a text frame.
+
+        Return |True| if this axis title has a text frame, and |False|
+        otherwise. Assigning |True| causes a text frame to be added if not
+        already present. Assigning |False| causes any existing text frame to
+        be removed along with any text contained in the text frame.
+        """
+        if self._title.tx_rich is None:
+            return False
+        return True
+
+    @has_text_frame.setter
+    def has_text_frame(self, value):
+        if bool(value) is True:
+            self._title.get_or_add_tx_rich()
+        else:
+            self._title._remove_tx()
+
+    @property
+    def text_frame(self):
+        """|TextFrame| instance for this axis title.
+
+        Return a |TextFrame| instance allowing read/write access to the text
+        of this axis title and its text formatting properties. Accessing this
+        property is destructive as it adds a new text frame if not already
+        present.
+        """
+        rich = self._title.get_or_add_tx_rich()
+        return TextFrame(rich, self)
 
 
 class CategoryAxis(_BaseAxis):
     """
     A category axis of a chart.
     """
+    @property
+    def category_type(self):
+        """
+        A member of :ref:`XlCategoryType` specifying the scale type of this
+        axis. Unconditionally ``CATEGORY_SCALE`` for a |CategoryAxis| object.
+        """
+        return XL_CATEGORY_TYPE.CATEGORY_SCALE
+
+
+class DateAxis(_BaseAxis):
+    """
+    A category axis with dates as its category labels and having some special
+    display behaviors such as making length of equal periods equal and
+    normalizing month start dates despite unequal month lengths.
+    """
+    @property
+    def category_type(self):
+        """
+        A member of :ref:`XlCategoryType` specifying the scale type of this
+        axis. Unconditionally ``TIME_SCALE`` for a |DateAxis| object.
+        """
+        return XL_CATEGORY_TYPE.TIME_SCALE
 
 
 class MajorGridlines(ElementProxy):

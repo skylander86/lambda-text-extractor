@@ -239,6 +239,15 @@ class Classes(MutableSet):
 
 class HtmlMixin(object):
 
+    def set(self, key, value=None):
+        """set(self, key, value=None)
+
+        Sets an element attribute.  If no value is provided, or if the value is None,
+        creates a 'boolean' attribute without value, e.g. "<form novalidate></form>"
+        for ``form.set('novalidate')``.
+        """
+        super(HtmlElement, self).set(key, value)
+
     @property
     def classes(self):
         """
@@ -682,8 +691,9 @@ class HtmlComment(etree.CommentBase, HtmlMixin):
 
 
 class HtmlElement(etree.ElementBase, HtmlMixin):
-    # Override etree.ElementBase.cssselect, despite the MRO
+    # Override etree.ElementBase.cssselect() and set(), despite the MRO (FIXME: change base order?)
     cssselect = HtmlMixin.cssselect
+    set = HtmlMixin.set
 
 
 class HtmlProcessingInstruction(etree.PIBase, HtmlMixin):
@@ -762,15 +772,14 @@ def document_fromstring(html, parser=None, ensure_head_body=False, **kw):
 
 def fragments_fromstring(html, no_leading_text=False, base_url=None,
                          parser=None, **kw):
-    """
-    Parses several HTML elements, returning a list of elements.
+    """Parses several HTML elements, returning a list of elements.
 
-    The first item in the list may be a string (though leading
-    whitespace is removed).  If no_leading_text is true, then it will
-    be an error if there is leading text, and it will always be a list
-    of only elements.
+    The first item in the list may be a string.
+    If no_leading_text is true, then it will be an error if there is
+    leading text, and it will always be a list of only elements.
 
-    base_url will set the document's base_url attribute (and the tree's docinfo.URL)
+    base_url will set the document's base_url attribute
+    (and the tree's docinfo.URL).
     """
     if parser is None:
         parser = html_parser
@@ -1010,7 +1019,7 @@ class FormElement(HtmlElement):
         results = []
         for el in self.inputs:
             name = el.name
-            if not name:
+            if not name or 'disabled' in el.attrib:
                 continue
             tag = _nons(el.tag)
             if tag == 'textarea':
@@ -1027,7 +1036,7 @@ class FormElement(HtmlElement):
                     "Unexpected tag: %r" % el)
                 if el.checkable and not el.checked:
                     continue
-                if el.type in ('submit', 'image', 'reset'):
+                if el.type in ('submit', 'image', 'reset', 'file'):
                     continue
                 value = el.value
                 if value is not None:
@@ -1128,6 +1137,8 @@ def open_http_urllib(method, url, values):
         data = None
     else:
         data = urlencode(values)
+        if not isinstance(data, bytes):
+            data = data.encode('ASCII')
     return urlopen(url, data)
 
 
@@ -1316,9 +1327,7 @@ class SelectElement(InputMixin, HtmlElement):
             if el.get('selected') is not None:
                 value = el.get('value')
                 if value is None:
-                    value = el.text or ''
-                if value:
-                    value = value.strip()
+                    value = (el.text or '').strip()
                 return value
         return None
 
@@ -1333,13 +1342,10 @@ class SelectElement(InputMixin, HtmlElement):
             return
         checked_option = None
         if value is not None:
-            value = value.strip()
             for el in _options_xpath(self):
                 opt_value = el.get('value')
                 if opt_value is None:
-                    opt_value = el.text or ''
-                if opt_value:
-                    opt_value = opt_value.strip()
+                    opt_value = (el.text or '').strip()
                 if opt_value == value:
                     checked_option = el
                     break
@@ -1370,9 +1376,7 @@ class SelectElement(InputMixin, HtmlElement):
         for el in _options_xpath(self):
             value = el.get('value')
             if value is None:
-                value = el.text or ''
-            if value:
-                value = value.strip()
+                value = (el.text or '').strip()
             options.append(value)
         return options
 
@@ -1417,18 +1421,14 @@ class MultipleSelectOptions(SetMixin):
             if 'selected' in option.attrib:
                 opt_value = option.get('value')
                 if opt_value is None:
-                    opt_value = option.text or ''
-                if opt_value:
-                    opt_value = opt_value.strip()
+                    opt_value = (option.text or '').strip()
                 yield opt_value
 
     def add(self, item):
         for option in self.options:
             opt_value = option.get('value')
             if opt_value is None:
-                opt_value = option.text or ''
-            if opt_value:
-                opt_value = opt_value.strip()
+                opt_value = (option.text or '').strip()
             if opt_value == item:
                 option.set('selected', '')
                 break
@@ -1440,9 +1440,7 @@ class MultipleSelectOptions(SetMixin):
         for option in self.options:
             opt_value = option.get('value')
             if opt_value is None:
-                opt_value = option.text or ''
-            if opt_value:
-                opt_value = opt_value.strip()
+                opt_value = (option.text or '').strip()
             if opt_value == item:
                 if 'selected' in option.attrib:
                     del option.attrib['selected']

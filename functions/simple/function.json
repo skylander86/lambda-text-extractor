@@ -1,0 +1,6 @@
+{
+    "name": "simple",
+    "description": "Extract text without using OCR. Falls back to OCR when necessary.",
+    "timeout": 60,
+    "memory": 512
+}

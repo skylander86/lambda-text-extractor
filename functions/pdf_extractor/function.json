@@ -1,7 +1,0 @@
-{
-    "name": "pdf_extractor",
-    "description": "Extract text from PDF files.",
-    "handler": "pdf_extractor.extract",
-    "timeout": 300,
-    "memory": 256
-}

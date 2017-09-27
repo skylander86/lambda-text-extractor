@@ -8,11 +8,13 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 from collections import Sequence
 
-from .axis import CategoryAxis, ValueAxis
+from .axis import CategoryAxis, DateAxis, ValueAxis
+from ..dml.chtfmt import ChartFormat
 from .legend import Legend
 from .plot import PlotFactory, PlotTypeInspector
 from .series import SeriesCollection
-from ..shared import PartElementProxy
+from ..shared import ElementProxy, PartElementProxy
+from ..text.text import TextFrame
 from ..util import lazyproperty
 from .xmlwriter import SeriesXmlRewriterFactory
 
@@ -35,6 +37,10 @@ class Chart(PartElementProxy):
         catAx_lst = self._chartSpace.catAx_lst
         if catAx_lst:
             return CategoryAxis(catAx_lst[0])
+
+        dateAx_lst = self._chartSpace.dateAx_lst
+        if dateAx_lst:
+            return DateAxis(dateAx_lst[0])
 
         valAx_lst = self._chartSpace.valAx_lst
         if valAx_lst:
@@ -65,6 +71,17 @@ class Chart(PartElementProxy):
         self._chartSpace._add_style(val=value)
 
     @property
+    def chart_title(self):
+        """A |ChartTitle| object providing access to title properties.
+
+        Calling this property is destructive in the sense it adds a chart
+        title element (`c:title`) to the chart XML if one is not already
+        present. Use :attr:`has_title` to test for presence of a chart title
+        non-destructively.
+        """
+        return ChartTitle(self._element.get_or_add_title())
+
+    @property
     def chart_type(self):
         """
         Read-only :ref:`XlChartType` enumeration value specifying the type of
@@ -88,6 +105,27 @@ class Chart(PartElementProxy):
     @has_legend.setter
     def has_legend(self, value):
         self._chartSpace.chart.has_legend = bool(value)
+
+    @property
+    def has_title(self):
+        """Read/write boolean, specifying whether this chart has a title.
+
+        Assigning |True| causes a title to be added if not already present.
+        Assigning |False| removes any existing title along with its text and
+        settings.
+        """
+        title = self._chartSpace.chart.title
+        if title is None:
+            return False
+        return True
+
+    @has_title.setter
+    def has_title(self, value):
+        chart = self._chartSpace.chart
+        if bool(value) is False:
+            chart._remove_title()
+            return
+        chart.get_or_add_title()
 
     @property
     def legend(self):
@@ -129,10 +167,12 @@ class Chart(PartElementProxy):
     @lazyproperty
     def series(self):
         """
-        The |SeriesCollection| object containing all the series in this
-        chart.
+        A |SeriesCollection| object containing all the series in this
+        chart. When the chart has multiple plots, all the series for the
+        first plot appear before all those for the second, and so on. Series
+        within a plot have an explicit ordering and appear in that sequence.
         """
-        return SeriesCollection(self._chartSpace)
+        return SeriesCollection(self._chartSpace.plotArea)
 
     @property
     def value_axis(self):
@@ -157,6 +197,63 @@ class Chart(PartElementProxy):
         return self.part.chart_workbook
 
 
+class ChartTitle(ElementProxy):
+    """Provides properties for manipulating a chart title."""
+
+    # This shares functionality with AxisTitle, which could be factored out
+    # into a base class, perhaps pptx.chart.shared.BaseTitle. I suspect they
+    # actually differ in certain fuller behaviors, but at present they're
+    # essentially identical.
+
+    __slots__ = ('_title', '_format')
+
+    def __init__(self, title):
+        super(ChartTitle, self).__init__(title)
+        self._title = title
+
+    @lazyproperty
+    def format(self):
+        """|ChartFormat| object providing access to line and fill formatting.
+
+        Return the |ChartFormat| object providing shape formatting properties
+        for this chart title, such as its line color and fill.
+        """
+        return ChartFormat(self._title)
+
+    @property
+    def has_text_frame(self):
+        """Read/write Boolean specifying whether this title has a text frame.
+
+        Return |True| if this chart title has a text frame, and |False|
+        otherwise. Assigning |True| causes a text frame to be added if not
+        already present. Assigning |False| causes any existing text frame to
+        be removed along with its text and formatting.
+        """
+        if self._title.tx_rich is None:
+            return False
+        return True
+
+    @has_text_frame.setter
+    def has_text_frame(self, value):
+        if bool(value) is False:
+            self._title._remove_tx()
+            return
+        self._title.get_or_add_tx_rich()
+
+    @property
+    def text_frame(self):
+        """|TextFrame| instance for this chart title.
+
+        Return a |TextFrame| instance allowing read/write access to the text
+        of this chart title and its text formatting properties. Accessing this
+        property is destructive in the sense it adds a text frame if one is
+        not present. Use :attr:`has_text_frame` to test for the presence of
+        a text frame non-destructively.
+        """
+        rich = self._title.get_or_add_tx_rich()
+        return TextFrame(rich, self)
+
+
 class _Plots(Sequence):
     """
     The sequence of plots in a chart, such as a bar plot or a line plot. Most
@@ -170,7 +267,7 @@ class _Plots(Sequence):
         self._chart = chart
 
     def __getitem__(self, index):
-        xCharts = list(self._plotArea.iter_plots())
+        xCharts = self._plotArea.xCharts
         if isinstance(index, slice):
             plots = [PlotFactory(xChart, self._chart) for xChart in xCharts]
             return plots[index]
@@ -179,5 +276,4 @@ class _Plots(Sequence):
             return PlotFactory(xChart, self._chart)
 
     def __len__(self):
-        plot_elms = [p for p in self._plotArea.iter_plots()]
-        return len(plot_elms)
+        return len(self._plotArea.xCharts)
