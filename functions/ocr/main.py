@@ -182,8 +182,9 @@ def pdf_to_text_with_ocr(document_path, event, context, create_searchable_pdf=Tr
 
         async def _invoke_textract_ocr_tasks(_completed_text_contents, _completed_searchable_pdf_fnames, timeout):
             tasks = []
+            cur_uuid = str(uuid4())
             for page in range(1, num_pages + 1):
-                page_uuid = '{:04d}_{}'.format(page, str(uuid4()))
+                page_uuid = '{}_{:04d}'.format(cur_uuid, page)  # base name for each page's intermediate output
                 page_text_uri = os.path.join(temp_uri_prefix, '{}.txt'.format(page_uuid))
 
                 payload = dict(document_uri=document_uri, text_uri=page_text_uri, temp_uri_prefix=temp_uri_prefix, page=page)

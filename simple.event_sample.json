@@ -1,5 +1,0 @@
-{
-    "uuid": "00e2e5a9-ae47-4b83-9124-a2f308c7dcd3",
-    "document_uri": "s3://my-bucket/00e2e5a9-ae47-4b83-9124-a2f308c7dcd3/document.pdf",
-    "temp_uri_prefix": "s3://my-bucket/00e2e5a9-ae47-4b83-9124-a2f308c7dcd3"
-}

@@ -2,11 +2,11 @@
     "name": "textractor",
     "description": "Extract text from binary documents.",
     "runtime": "python3.6",
-    "role": "",
+    "role": "arn:aws:iam::394252546268:role/textractor_lambda_function",
     "defaultEnvironment": "development",
     "environment": {
         "LOG_LEVEL": "INFO",
-        "TEXTRACTOR_OCR": "textractor-ocr",
-        "TEXTRACTOR_SIMPLE": "textractor-simple"
+        "TEXTRACTOR_OCR": "textractor_ocr",
+        "TEXTRACTOR_SIMPLE": "textractor_simple"
     }
 }
