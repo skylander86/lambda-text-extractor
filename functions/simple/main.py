@@ -22,8 +22,6 @@ TEXTRACTOR_OCR = os.environ['TEXTRACTOR_OCR']
 
 lambda_client = boto3.client('lambda')
 
-logger = None
-
 with NamedTemporaryFile(mode='w', delete=False) as f:
     CATDOCRC_PATH = f.name
     f.write('charset_path = {}\n'.format(os.path.join(LIB_DIR, 'catdoc', 'charsets')))
@@ -31,14 +29,16 @@ with NamedTemporaryFile(mode='w', delete=False) as f:
 #end with
 
 logging.basicConfig(format='%(asctime)-15s [%(name)s-%(process)d] %(levelname)s: %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def handle(event, context):
     global logger
 
-    uuid = event['uuid']
     document_uri = event['document_uri']
-    temp_uri_prefix = event['temp_uri_prefix']
+    temp_uri_prefix = event.get('temp_uri_prefix', event['document_uri'] + '-temp')
+    text_uri = event.get('text_uri', document_uri + '.txt')
+    disable_ocr = event.get('disable_ocr', False)
 
     # AWS Lambda auto-retries errors for 3x. This should make it disable retrying...kinda. See https://stackoverflow.com/questions/32064038/aws-lambda-function-triggering-multiple-times-for-a-single-event
     aws_context_retry_uri = os.path.join(temp_uri_prefix, 'aws_lambda_request_ids', context.aws_request_id)
@@ -46,10 +46,7 @@ def handle(event, context):
         return
     uri_dump(aws_context_retry_uri, '', mode='w')
 
-    logger.info('new_document', lambda_log_stream_name=context.log_stream_name, lambda_request_id=context.aws_request_id, **event)
-
-    text_uri = event.get('text_uri', os.path.join(temp_uri_prefix, 'extracted.txt'))
-    disable_ocr = event.get('disable_ocr', False)
+    logger.info('{} invoked with event {}.'.format(os.environ['AWS_LAMBDA_FUNCTION_NAME'], json.dumps(event)))
 
     o = urlparse(document_uri)
     _, ext = os.path.splitext(o.path)  # get format from extension
@@ -57,31 +54,28 @@ def handle(event, context):
 
     extract_func = PARSE_FUNCS.get(ext)
     if extract_func is None:
-        logger.warning('unsupported_extension', document_uri=document_uri, uuid=uuid)
         uri_dump(text_uri, '', mode='w', textio_args={'errors': 'ignore'}, storage_args=dict(ContentType='text/plain', Metadata=dict(Exception='<{}> has unsupported extension "{}".'.format(document_uri, ext))))
-
         raise ValueError('<{}> has unsupported extension "{}".'.format(document_uri, ext))
     #end if
 
     fallback_to_ocr = False
     if extract_func is False:
         fallback_to_ocr = True
-        logger.info('fallback_to_ocr', document_uri=document_uri, size=0, uuid=uuid, textractor_ocr=TEXTRACTOR_OCR)
+        logger.info('Fallback to OCR for <{document_uri}>.'.format(document_uri=document_uri))
 
     else:
         with NamedTemporaryFile(mode='wb', suffix=ext, delete=False) as f:
             document_path = f.name
             f.write(uri_read(document_uri, mode='rb'))
-            logger.debug('document_download', document_uri=document_uri, document_path=document_path, uuid=uuid)
+            logger.debug('Downloaded <{}> to <{}>.'.format(document_uri, document_path))
         #end with
 
         textractor_results = {}
         try:
             text = extract_func(document_path, event, context)
-            logger.info('extract_complete', document_uri=document_uri, text_uri=text_uri, size=len(text), extract_func=extract_func.__name__, uuid=uuid)
 
             if extract_func is pdf_to_text and len(text) < 512 and not disable_ocr:
-                logger.info('fallback_to_ocr', document_uri=document_uri, size=len(text), uuid=uuid, textractor_ocr=TEXTRACTOR_OCR)
+                logger.info('Fallback to OCR for <{document_uri}>.'.format(document_uri=document_uri))
                 textractor_results = dict(method='ocr', size=-1, success=False)
                 fallback_to_ocr = True
 
@@ -89,13 +83,13 @@ def handle(event, context):
                 textractor_results = dict(method=extract_func.__name__, size=len(text), success=True)
 
                 uri_dump(text_uri, text, mode='w', textio_args={'errors': 'ignore'}, storage_args=dict(ContentType='text/plain', Metadata=dict(method=extract_func.__name__)))
-                logger.debug('dump_extracted_text', document_uri=document_uri, text_uri=text_uri, uuid=uuid)
+                logger.info('Extracted {} bytes from <{}> to <{}>.'.format(len(text), document_uri, text_uri))
 
-                if len(text) == 0: logger.warning('empty_content', document_uri=document_uri, text_uri=text_uri, uuid=uuid)
+                if len(text) == 0: logger.warning('<{}> does not contain any content.'.format(document_uri))
             #end if
 
         except Exception as e:
-            logger.exception('extract_exception', document_uri=document_uri, uuid=uuid)
+            logger.exception('Extraction exception for <{}>'.format(document_uri))
             textractor_results = dict(success=False, reason=str(e))
             uri_dump(text_uri, '', mode='w', textio_args={'errors': 'ignore'}, storage_args=dict(ContentType='text/plain', Metadata=dict(Exception=str(e))))
 
@@ -114,7 +108,7 @@ def handle(event, context):
             Payload=json.dumps(payload)
         )
         response['Payload'] = response['Payload'].read().decode('utf-8')
-        logger.debug('invoke_textract_ocr', response=response, payload=payload, uuid=uuid)
+        logger.debug('Invoked OCR lambda <{}> with payload {}.\nResponse is {}'.format(TEXTRACTOR_OCR, json.dumps(payload), response))
 
     else:
         payload['text_uri'] = text_uri
@@ -123,16 +117,16 @@ def handle(event, context):
             if cb['step'] == 'textractor':
                 try:
                     uri_dump(cb['uri'], json.dumps(payload), mode='w')
-                    logger.info('callback', uuid=uuid, callback=cb, payload=payload)
+                    logger.info('Called callback {} with payload {}.'.format(json.dumps(cb), json.dumps(payload)))
 
-                except Exception as e: logger.exception('callback_exception', uuid=uuid, callback=cb, payload=payload)
+                except Exception as e: logger.exception('Callback exception for {} with payload {}.'.format(json.dumps(cb), json.dumps(payload)))
             #end if
         #end for
     #end if
 
     payload.setdefault('results', {})
     payload['results']['textractor'] = textractor_results
-    logger.debug('textract_done', payload=payload)
+    logger.debug('Textraction complete.')
 
     return payload
 #end def
@@ -168,15 +162,15 @@ def doc_to_text(document_path, event, context):
         text = text.decode('utf-8', errors='ignore').strip()
     except CalledProcessError as e:
         if b'Rich Text Format' in e.output:
-            logger.debug('rich_text_file', document_uri=event['document_uri'], uuid=event['uuid'], output=e.output.decode('ascii', errors='ignore'))
+            logger.debug('Antiword failed on possible Rich Text file <{}>.'.format(event['document_uri']))
             return rtf_to_text(document_path, event, context)
 
         elif b'"docx" file' in e.output or is_zipfile(document_path):
-            logger.debug('docx_file', document_uri=event['document_uri'], uuid=event['uuid'], output=e.output.decode('ascii', errors='ignore'))
+            logger.debug('Antiword failed on possible docx file <{}>.'.format(event['document_uri']))
             return docx_to_text(document_path, event, context)
 
         else:
-            logger.debug('antiword_exception', document_uri=event['document_uri'], uuid=event['uuid'], output=e.output.decode('ascii', errors='ignore'), returncode=e.returncode)
+            logger.exception('Antiword exception with output "{}".'.format(e.output.decode('ascii', errors='ignore')))
             text = None
         #end if
     #end try
@@ -214,7 +208,7 @@ def docx_to_text(document_path, event, context):
         return text
 
     except Exception:
-        logger.exception('python_docx_exception')
+        logger.exception('Exception while parsing <{}>.'.format(event['document_uri']))
     #end try
 
     # Extract it from the XML
@@ -387,7 +381,7 @@ PARSE_FUNCS = {
     '.xls': xls_to_text,
     '.xlsx': xls_to_text,
     # image ones
-    '.png': False,
+    '.png': False,  # False means default to OCR
     '.tiff': False,
     '.tif': False,
     '.jpg': False,

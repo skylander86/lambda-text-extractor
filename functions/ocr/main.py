@@ -32,19 +32,21 @@ TEXTRACT_OUTPUT_WAIT_BUFFER_TIME = float(os.environ.get('TEXTRACT_OUTPUT_WAIT_BU
 
 lambda_client = boto3.client('lambda')
 
-pil_loaded = None
-logger = None
-
 logging.basicConfig(format='%(asctime)-15s [%(name)s-%(process)d] %(levelname)s: %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def handle(event, context):
     global logger
 
-    uuid = event['uuid']
     document_uri = event['document_uri']
-    temp_uri_prefix = event['temp_uri_prefix']
+    temp_uri_prefix = event.get('temp_uri_prefix', event['document_uri'] + '-temp')
+    text_uri = event.get('text_uri', document_uri + '.txt')
+    searchable_pdf_uri = event.get('searchable_pdf_uri', document_uri + '.searchable.pdf')
+    create_searchable_pdf = event.get('create_searchable_pdf', True)
     page = event.get('page')
+
+    event['temp_uri_prefix'] = temp_uri_prefix
 
     # AWS Lambda auto-retries errors for 3x. This should make it disable retrying...kinda. See https://stackoverflow.com/questions/32064038/aws-lambda-function-triggering-multiple-times-for-a-single-event
     aws_context_retry_uri = os.path.join(temp_uri_prefix, 'aws_lambda_request_ids', context.aws_request_id)
@@ -54,11 +56,7 @@ def handle(event, context):
 
     start_time = time.time()
 
-    logger.info('textract_start', lambda_log_stream_name=context.log_stream_name, lambda_request_id=context.aws_request_id, **event)
-
-    text_uri = event.get('text_uri', os.path.join(temp_uri_prefix, 'extracted.txt'))
-    searchable_pdf_uri = event.get('searchable_pdf_uri', os.path.join(temp_uri_prefix, 'searchable.pdf'))
-    create_searchable_pdf = event.get('create_searchable_pdf', True)
+    logger.info('{} invoked with event {}.'.format(os.environ['AWS_LAMBDA_FUNCTION_NAME'], json.dumps(event)))
 
     o = urlparse(document_uri)
     _, ext = os.path.splitext(o.path)  # get format from extension
@@ -71,7 +69,7 @@ def handle(event, context):
     with NamedTemporaryFile(mode='wb', suffix=ext, delete=False) as f:
         document_path = f.name
         f.write(uri_read(document_uri, mode='rb'))
-        logger.debug('document_download', document_uri=document_uri, document_path=document_path, uuid=uuid)
+        logger.debug('Downloaded <{}> to <{}>.'.format(document_uri, document_path))
     #end with
 
     textractor_results = {}
@@ -87,7 +85,7 @@ def handle(event, context):
         textractor_results['size'] = len(text)
 
         uri_dump(text_uri, text, mode='w', textio_args={'errors': 'ignore'}, storage_args=dict(ContentType='text/plain', Metadata=meta))
-        if len(text) == 0: logger.warning('no_content', document_uri=document_uri, text_uri=text_uri, uuid=uuid)
+        if len(text) == 0: logger.warning('<{}> does not contain any content.'.format(document_uri))
 
         searchable_pdf_path = textractor_results.pop('searchable_pdf_path', None)
         if searchable_pdf_path:
@@ -95,8 +93,8 @@ def handle(event, context):
 
             with open(searchable_pdf_path, 'rb') as f:
                 contents = f.read()
-                uri_dump(searchable_pdf_uri, contents, mode='wb', storage_args=dict(ContentType='application/pdf'))
-                logger.debug('dump_searchable_pdf', searchable_pdf_uri=searchable_pdf_uri, document_uri=document_uri, uuid=uuid, size=len(contents))
+                uri_dump(searchable_pdf_uri, contents, mode='wb', storage_args=dict(ContentType='application/pdf', Metadata=meta))
+                logger.debug('Searchable PDF version of <{}> saved to <{}>.'.format(document_uri, searchable_pdf_uri))
             #end with
 
             textractor_results['searchable_pdf_uri'] = searchable_pdf_uri
@@ -105,11 +103,11 @@ def handle(event, context):
         textractor_results['success'] = True
         textractor_results.update(meta)
 
-        if page: logger.debug('extract_page_complete', document_uri=document_uri, text_uri=text_uri, extract_func=extract_func.__name__, uuid=uuid, elapsed_time=time.time() - start_time, **textractor_results)
-        else: logger.debug('extract_complete', document_uri=document_uri, text_uri=text_uri, extract_func=extract_func.__name__, uuid=uuid, elapsed_time=time.time() - start_time, **textractor_results)
+        if page: logger.debug('Extracted page {} of <{}> to <{}> (took {:.3f} seconds).'.format(page, document_uri, text_uri, time.time() - start_time))
+        else: logger.debug('Extracted pages of <{}> to <{}> (took {:.3f} seconds).'.format(document_uri, text_uri, time.time() - start_time))
 
     except Exception as e:
-        logger.exception('extract_exception', document_uri=document_uri, uuid=uuid)
+        logger.exception('Extraction exception for <{}>'.format(document_uri))
         textractor_results = dict(success=False, reason=str(e))
         uri_dump(text_uri, '', mode='w', textio_args={'errors': 'ignore'}, storage_args=dict(ContentType='text/plain', Metadata=dict(Exception=str(e))))
 
@@ -127,15 +125,14 @@ def handle(event, context):
         if cb['step'] == 'textractor':
             try:
                 uri_dump(cb['uri'], json.dumps(payload), mode='w')
-                logger.info('textractor_callback', uuid=uuid, callback=cb, payload=payload)
-
-            except Exception as e: logger.exception('textractor_callback_exception', uuid=uuid, callback=cb, payload=payload)
+                logger.info('Called callback {} with payload {}.'.format(json.dumps(cb), json.dumps(payload)))
+            except Exception as e: logger.exception('Callback exception for {} with payload {}.'.format(json.dumps(cb), json.dumps(payload)))
         #end if
     #end for
 
     payload.setdefault('results', {})
     payload['results']['textractor'] = textractor_results
-    logger.info('textract_done', payload=payload, uuid=uuid, elapsed_time=time.time() - start_time)
+    logger.debug('Textraction complete.')
 
     return payload
 #end def
@@ -163,7 +160,6 @@ def _get_subprocess_output(*args, **kwargs):
 def pdf_to_text_with_ocr(document_path, event, context, create_searchable_pdf=True):
     global logger
 
-    uuid = event['uuid']
     document_uri = event['document_uri']
     page = event.get('page')
     temp_uri_prefix = event['temp_uri_prefix']
@@ -190,7 +186,7 @@ def pdf_to_text_with_ocr(document_path, event, context, create_searchable_pdf=Tr
                 page_uuid = '{:04d}_{}'.format(page, str(uuid4()))
                 page_text_uri = os.path.join(temp_uri_prefix, '{}.txt'.format(page_uuid))
 
-                payload = dict(uuid=uuid, document_uri=document_uri, text_uri=page_text_uri, temp_uri_prefix=temp_uri_prefix, page=page)
+                payload = dict(document_uri=document_uri, text_uri=page_text_uri, temp_uri_prefix=temp_uri_prefix, page=page)
 
                 if create_searchable_pdf:
                     page_searchable_pdf_uri = os.path.join(temp_uri_prefix, '{}.pdf'.format(page_uuid))
@@ -212,15 +208,13 @@ def pdf_to_text_with_ocr(document_path, event, context, create_searchable_pdf=Tr
                 _completed_text_contents[page] = page_text
                 _completed_searchable_pdf_fnames[page] = page_searchable_pdf_fname
             #end for
-
-            logger.info('get_textract_output_complete', uuid=uuid, document_uri=document_uri, tasks_count=len(tasks), completed=len(completed), pending=len(pending), textract_output_wait_timeout=timeout, remaining_time=context.get_remaining_time_in_millis() / 1000.0)
         #end def
 
         textract_output_wait_timeout = (context.get_remaining_time_in_millis() / 1000.0) - MERGE_SEARCHABLE_PDF_DURATION - RETURN_RESULTS_DURATION - TEXTRACT_OUTPUT_WAIT_BUFFER_TIME  # asyncio.wait seems to overshoot around 7 seconds everytime
         completed_text_contents, completed_searchable_pdf_fnames = {}, {}
 
         if textract_output_wait_timeout <= 0:
-            logger.warning('textract_output_wait_timeout', uuid=uuid, document_uri=document_uri, textract_output_wait_timeout=textract_output_wait_timeout, remaining_time=context.get_remaining_time_in_millis() / 1000.0, merge_searchable_pdf_duration=MERGE_SEARCHABLE_PDF_DURATION)
+            logger.warning('Wait timeout for OCR output is < 0!')
         else:
             event_loop.run_until_complete(_invoke_textract_ocr_tasks(completed_text_contents, completed_searchable_pdf_fnames, textract_output_wait_timeout))
         #end if
@@ -259,25 +253,22 @@ def pdf_to_text_with_ocr(document_path, event, context, create_searchable_pdf=Tr
             assert len(pdf_pages_filenames) == num_pages
 
             # Merge the individual pages of searchable PDFs together
-            merge_start_time = time.time()
             merge_searchable_pdf_timeout = (context.get_remaining_time_in_millis() / 1000.0) - RETURN_RESULTS_DURATION
             with NamedTemporaryFile(suffix='.pdf', delete=False) as f:
                 searchable_pdf_path = f.name
             _get_subprocess_output([os.path.join(BIN_DIR, 'gs'), '-sDEVICE=pdfwrite', '-dBATCH', '-dNOPAUSE', '-q', '-dPDFSETTINGS=/ebook', '-sOutputFile={}'.format(searchable_pdf_path)] + pdf_pages_filenames, shell=False, timeout=merge_searchable_pdf_timeout)  # merge and compress pdf
 
-            logger.info('merge_searchable_pdf_complete', document_uri=document_uri, uuid=uuid, missing_searchable_pdf_pages=missing_searchable_pdf_pages, num_pages=num_pages, merge_searchable_pdf_timeout=merge_searchable_pdf_timeout, elapsed_time=time.time() - merge_start_time)
-
         except subprocess.TimeoutExpired:
             searchable_pdf_path = None
-            logger.warning('merge_searchable_pdf_timeout', document_uri=document_uri, uuid=uuid, missing_searchable_pdf_pages=missing_searchable_pdf_pages, num_pages=num_pages, merge_searchable_pdf_timeout=merge_searchable_pdf_timeout)
+            logger.warning('Timeout while merging searchable PDF for <{}>.'.format(document_uri))
 
         except Exception as e:
-            logger.exception('merge_searchable_pdf_exception', document_uri=document_uri, uuid=uuid)
+            logger.exception('Exception while merging searchable PDF for <{}>.'.format(document_uri))
 
         finally:
             for fname in pdf_pages_filenames:
                 try: os.remove(fname)
-                except Exception as e: logger.exception('searchable_pdf_remove_exception', filename=fname, uuid=uuid, document_uri=document_uri)
+                except Exception as e: logger.exception('searchable_pdf_remove_exception', filename=fname, document_uri=document_uri)
             #end for
         #end try
     #end if
@@ -285,17 +276,17 @@ def pdf_to_text_with_ocr(document_path, event, context, create_searchable_pdf=Tr
     meta = dict(num_pages=str(num_pages))
 
     if missing_text_pages:
-        logger.info('missing_text_pages', uuid=uuid, document_uri=document_uri, missing_text_pages=missing_text_pages)
+        logger.info('Missing pages {} in <{}>.'.format(missing_text_pages, document_uri))
         meta['missing_text_pages'] = ','.join(str(p) for p in missing_text_pages)
     #end if
 
     if empty_content_pages:
-        logger.info('empty_content_pages', uuid=uuid, document_uri=document_uri, empty_content_pages=empty_content_pages)
+        logger.info('Empty content pages {} in <{}>.'.format(empty_content_pages, document_uri))
         meta['empty_content_pages'] = ','.join(str(p) for p in empty_content_pages)
     #end if
 
     if missing_searchable_pdf_pages:
-        logger.info('missing_searchable_pdf_pages', uuid=uuid, document_uri=document_uri, missing_searchable_pdf_pages=missing_searchable_pdf_pages)
+        logger.info('Missing searchable PDF pages {} in <{}>.'.format(missing_searchable_pdf_pages, document_uri))
         meta['missing_searchable_pdf_pages'] = ','.join(str(p) for p in missing_searchable_pdf_pages)
     #end if
 
@@ -329,8 +320,6 @@ def pdf_to_text_with_ocr_single_page(document_path, event, context, create_searc
 
 
 def image_to_text(document_path, event, context, create_searchable_pdf=True):
-    global pil_loaded
-
     _, ext = os.path.splitext(document_path)
     ext = ext.lower()
 

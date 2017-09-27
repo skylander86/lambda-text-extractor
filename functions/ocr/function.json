@@ -1,6 +1,6 @@
 {
     "name": "ocr",
-    "description": "[development] Extract text from PDF/image files using OCR.",
+    "description": "Extract text from PDF/image files using OCR.",
     "timeout": 60,
     "memory": 512,
     "environment": {
