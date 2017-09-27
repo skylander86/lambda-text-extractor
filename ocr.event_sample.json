@@ -1,6 +1,0 @@
-{
-    "uuid": "b32bd7d2-9fa7-4382-adde-0ddd6293c14e",
-    "document_uri": "s3://my-bucket/b32bd7d2-9fa7-4382-adde-0ddd6293c14e/document.pdf",
-    "temp_uri_prefix": "s3://my-bucket/b32bd7d2-9fa7-4382-adde-0ddd6293c14e",
-    "create_searchable_pdf": true
-}
