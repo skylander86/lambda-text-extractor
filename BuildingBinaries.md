@@ -150,7 +150,7 @@ The current version of pillow is 4.2.1.
 
 Because PIL is quite huge and we cannot upload large code sizes to Lambda, we store PIL on S3 to be downloaded on use.
 
-    tar -cv -C lib-linux_x64/ PIL -O > test.tar | aws s3 cp - s3://ix-ml-assets/textractor/PIL.tar
+    tar -cv -C lib-linux_x64/ PIL -O > test.tar | aws s3 cp - s3://assets-bucket/textractor/PIL.tar
 
 ## PyPDF2 (DEPRECATED)
 
