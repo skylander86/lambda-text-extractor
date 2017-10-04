@@ -66,7 +66,11 @@ The `simple` function expects an `event` with
 
     aws s3 cp s3://bucket/tracemonkey.txt -
 
-It automatically fallbacks to `ocr` function when it necesay
+It automatically fallbacks to `ocr` function when:
+
+- file is a PDF (i.e., ends with `.pdf`),
+- text content is shorter than 32 characters, and
+- `disable_ocr` is `False`.
 
 ### OCR Text Extraction
 
@@ -126,4 +130,3 @@ If anybody knows of a better pattern for processing PDFs, do feel free to submit
 ## Building Binaries
 
 For more information on how we prepped the Lambda execution environment to run all these external software and libraries, see [Building Binaries](BuildingBinaries.md).
-
