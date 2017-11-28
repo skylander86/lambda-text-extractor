@@ -91,7 +91,7 @@ For more details about how PDF OCR extraction work here, see section on [PDF OCR
 
 #### Example
 
-    aws lambda invoke --function-name textractor_ocr --payload '{"document_uri": "https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf", "temp_uri_prefix": "s3://docbot-hippocrates-assets/", "text_uri": "s3://docbot-hippocrates-assets/tracemonkey.txt", "searchable_pdf_uri": "s3://docbot-hippocrates-assets/tracemonkey.searchable.pdf"}' -
+    aws lambda invoke --function-name textractor_ocr --payload '{"document_uri": "https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf", "temp_uri_prefix": "s3://bucket/", "text_uri": "s3://bucket/tracemonkey.txt", "searchable_pdf_uri": "s3://bucket/tracemonkey.searchable.pdf"}' -
 
     aws s3 cp s3://bucket/tracemonkey-5.txt -
 
