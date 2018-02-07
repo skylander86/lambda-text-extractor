@@ -59,6 +59,7 @@ def handle(event, context):
     #end if
 
     fallback_to_ocr = False
+    textractor_results = {}
     if extract_func is False:
         fallback_to_ocr = True
         logger.info('Fallback to OCR for <{document_uri}>.'.format(document_uri=document_uri))
@@ -70,7 +71,6 @@ def handle(event, context):
             logger.debug('Downloaded <{}> to <{}>.'.format(document_uri, document_path))
         #end with
 
-        textractor_results = {}
         try:
             text = extract_func(document_path, event, context)
 
@@ -108,6 +108,7 @@ def handle(event, context):
             Payload=json.dumps(payload)
         )
         response['Payload'] = response['Payload'].read().decode('utf-8')
+        textractor_results = dict(method='ocr', size=-1, success=False)
         logger.debug('Invoked OCR lambda <{}> with payload {}.\nResponse is {}'.format(TEXTRACTOR_OCR, json.dumps(payload), response))
 
     else:
