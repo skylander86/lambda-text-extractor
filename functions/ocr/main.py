@@ -12,7 +12,7 @@ import time
 from uuid import uuid4
 from urllib.parse import urlparse
 
-import aiobotocore
+from aiobotocore import session as aiobotocore
 
 import boto3
 
@@ -22,7 +22,7 @@ from pageutils import invoke_textract_ocr
 from utils import get_subprocess_output
 
 LAMBDA_TASK_ROOT = os.environ.get('LAMBDA_TASK_ROOT', os.path.dirname(os.path.abspath(__file__)))
-LAMBDA_FUNCTION_NAME = os.environ['LAMBDA_FUNCTION_NAME']
+LAMBDA_FUNCTION_NAME = os.environ.get('AWS_LAMBDA_FUNCTION_NAME', 'default_lambda_name')
 BIN_DIR = os.path.join(LAMBDA_TASK_ROOT, 'bin')
 LIB_DIR = os.path.join(LAMBDA_TASK_ROOT, 'lib')
 
@@ -56,7 +56,7 @@ def handle(event, context):
 
     start_time = time.time()
 
-    logger.info('{} invoked with event {}.'.format(os.environ['AWS_LAMBDA_FUNCTION_NAME'], json.dumps(event)))
+    logger.info('{} invoked with event {}.'.format(LAMBDA_FUNCTION_NAME, json.dumps(event)))
 
     o = urlparse(document_uri)
     _, ext = os.path.splitext(o.path)  # get format from extension
@@ -178,7 +178,7 @@ def pdf_to_text_with_ocr(document_path, event, context, create_searchable_pdf=Tr
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)  # Fix runtime error with "Event loop is closed" (see https://stackoverflow.com/questions/32598231/asyncio-runtimeerror-event-loop-is-closed/32615276#32615276)
         event_loop.set_default_executor(executor)
 
-        session = aiobotocore.get_session(loop=event_loop)
+        session = aiobotocore.get_session()
 
         async def _invoke_textract_ocr_tasks(_completed_text_contents, _completed_searchable_pdf_fnames, timeout):
             tasks = []

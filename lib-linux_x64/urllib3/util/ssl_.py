@@ -2,7 +2,7 @@ from __future__ import absolute_import
 import errno
 import warnings
 import hmac
-
+import socket
 from binascii import hexlify, unhexlify
 from hashlib import md5, sha1, sha256
 
@@ -339,3 +339,11 @@ def ssl_wrap_socket(sock, keyfile=None, certfile=None, cert_reqs=None,
         SNIMissingWarning
     )
     return context.wrap_socket(sock)
+
+
+def is_ipaddress(address):
+    try:
+        socket.inet_aton(address)  # Checks if it's a valid IPv4 address
+        return True
+    except socket.error:
+        return False

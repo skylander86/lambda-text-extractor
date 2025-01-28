@@ -24,10 +24,9 @@ from . import hdrs
 from .abc import AbstractCookieJar
 
 
-try:
-    from asyncio import ensure_future
-except ImportError:
-    ensure_future = asyncio.async
+
+from asyncio import ensure_future
+
 
 PY_34 = sys.version_info < (3, 5)
 PY_35 = sys.version_info >= (3, 5)

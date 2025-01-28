@@ -1,0 +1,5 @@
+{                                                           
+  "document_uri": "s3://co-remates-bucket-dev/compressed.tracemonkey-pldi-09.pdf",
+  "temp_uri_prefix": "s3://co-remates-bucket-dev",
+  "text_uri": "s3://co-remates-bucket-dev/compressed.tracemonkey-pldi-09.txt"
+}

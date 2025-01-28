@@ -1,0 +1,17 @@
+aiodns==3.2.0
+awscrt==0.23.6
+boto3==1.35.97
+brotli==1.1.0
+brotlicffi==1.1.0.0
+cryptography==44.0.0
+docutils==0.21.2
+gunicorn==23.0.0
+ordereddict==1.1
+protobuf==5.29.3
+pyOpenSSL==24.3.0
+pytest==8.3.4
+setuptools==58.0.4
+simplejson==3.19.3
+Sphinx==8.1.3
+urllib3_secure_extra==0.1.0
+uvloop==0.21.0
